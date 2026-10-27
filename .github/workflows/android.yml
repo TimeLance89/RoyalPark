@@ -1,7 +1,7 @@
 name: RoyalPark Android
 on:
   push:
-    branches: [main, develop, overnight]
+    branches: [main, develop, overnight, 'feature/**']
   pull_request:
   workflow_dispatch:
 

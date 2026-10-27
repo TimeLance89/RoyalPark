@@ -15,6 +15,14 @@ import android.graphics.Typeface;
 import android.graphics.drawable.GradientDrawable;
 import android.location.Location;
 import android.net.Uri;
+import android.os.Environment;
+import android.provider.MediaStore;
+import android.text.InputType;
+import androidx.core.content.FileProvider;
+import org.osmdroid.events.MapEventsOverlay;
+import org.osmdroid.events.MapEventsReceiver;
+import java.io.File;
+import java.io.IOException;
 import android.os.Build;
 import android.os.Bundle;
 import android.provider.Settings;
@@ -58,6 +66,7 @@ public final class MainActivity extends Activity {
     private static final int REQ_BT = 101;
     private static final int REQ_NOTIFICATIONS = 102;
     private static final int REQ_PHOTO = 103;
+    private static final int REQ_CAMERA = 104;
     private static final int TAB_MAP = 0;
     private static final int TAB_HISTORY = 1;
     private static final int TAB_SETTINGS = 2;
@@ -71,6 +80,8 @@ public final class MainActivity extends Activity {
     private Location deviceLocation;
     private Runnable afterPermission;
     private long photoSpotId = -1;
+    private Uri pendingCameraUri;
+    private String pendingCameraFile;
     private int currentTab = TAB_MAP;
 
     @Override public void onCreate(Bundle state) {
@@ -79,6 +90,12 @@ public final class MainActivity extends Activity {
         getWindow().setNavigationBarColor(BG);
         getWindow().getDecorView().setSystemUiVisibility(0);
         store = new ParkingStore(this);
+        if (state != null) {
+            photoSpotId = state.getLong("photoSpotId", -1);
+            pendingCameraFile = state.getString("pendingCameraFile");
+            String uri = state.getString("pendingCameraUri");
+            if (uri != null) pendingCameraUri = Uri.parse(uri);
+        }
         prefs = getSharedPreferences("royalpark", MODE_PRIVATE);
         // No tracking SDK and no analytics. Map tiles are fetched only for visible viewport.
         Configuration.getInstance().load(this, getPreferences(MODE_PRIVATE));
@@ -103,6 +120,27 @@ public final class MainActivity extends Activity {
         bottomBar.setBackgroundColor(CARD);
         mainRoot.addView(bottomBar);
         showTab(TAB_MAP);
+        handleQuickSave(getIntent());
+    }
+
+    private void handleQuickSave(Intent intent) {
+        if (intent != null && ParkingWidget.QUICK_SAVE.equals(intent.getAction())) {
+            intent.setAction(null);
+            mainRoot.post(this::saveCurrent);
+        }
+    }
+
+    @Override protected void onNewIntent(Intent intent) {
+        super.onNewIntent(intent);
+        setIntent(intent);
+        handleQuickSave(intent);
+    }
+
+    @Override protected void onSaveInstanceState(Bundle out) {
+        super.onSaveInstanceState(out);
+        out.putLong("photoSpotId", photoSpotId);
+        out.putString("pendingCameraFile", pendingCameraFile);
+        if (pendingCameraUri != null) out.putString("pendingCameraUri", pendingCameraUri.toString());
     }
 
     private int dp(float value) {
@@ -232,6 +270,10 @@ public final class MainActivity extends Activity {
             if (active.timerAt > 0) line(status, "Parkuhr: " + format(active.timerAt), 14, ACCENT, true, 8);
         }
         actionLine(status, "＋  Standort jetzt speichern", true, this::saveCurrent);
+        if (deviceLocation != null && deviceLocation.hasAccuracy()) {
+            line(status, "GPS-Genauigkeit: ±" + Math.round(deviceLocation.getAccuracy()) + " m",
+                    12, MUTED, false, 8);
+        }
         if (active != null) {
             actionLine(status, "↗  Zu meinem Auto navigieren", false, () -> navigate(active));
             LinearLayout tools = row();
@@ -256,7 +298,8 @@ public final class MainActivity extends Activity {
             margin(status, small, 10);
         }
         content.addView(status);
-        line(content, "KARTE", 12, MUTED, true, 20);
+        line(content, "KARTE · Lange auf die Karte tippen, um einen Punkt zu speichern",
+                12, MUTED, true, 20);
         FrameLayout frame = new FrameLayout(this);
         frame.setBackground(shape(CARD_BRIGHT, 20));
         map = new MapView(this);
@@ -268,6 +311,24 @@ public final class MainActivity extends Activity {
             v.getParent().requestDisallowInterceptTouchEvent(true);
             return false;
         });
+        map.getOverlays().add(new MapEventsOverlay(new MapEventsReceiver() {
+            @Override public boolean singleTapConfirmedHelper(GeoPoint point) { return false; }
+            @Override public boolean longPressHelper(GeoPoint point) {
+                new AlertDialog.Builder(MainActivity.this)
+                        .setTitle("Parkplatz hier speichern?")
+                        .setMessage("Den Punkt " + String.format(Locale.GERMANY, "%.5f, %.5f",
+                                point.getLatitude(), point.getLongitude()) + " als Parkplatz markieren?")
+                        .setNegativeButton("Abbrechen", null)
+                        .setPositiveButton("Speichern", (dialog, which) -> {
+                            ParkingSpot spot = store.save(point.getLatitude(), point.getLongitude(), "", "MAP");
+                            AlarmScheduler.cancel(MainActivity.this);
+                            ParkingWidget.updateAll(MainActivity.this);
+                            showTab(TAB_MAP);
+                            editNote(spot);
+                        }).show();
+                return true;
+            }
+        }));
         map.getController().setZoom(active != null ? 16.7 : 5.7);
         map.getController().setCenter(active != null
                 ? new GeoPoint(active.latitude, active.longitude)
@@ -334,6 +395,7 @@ public final class MainActivity extends Activity {
             actionLine(item, "↗  Navigation", false, () -> navigate(spot));
             actionLine(item, isActive ? "Aktueller Parkplatz ✓" : "Als aktuellen Parkplatz wählen", false, () -> {
                 store.setActiveId(spot.id);
+                ParkingWidget.updateAll(this);
                 showTab(TAB_HISTORY);
             });
             actionLine(item, "Eintrag löschen", false, () -> new AlertDialog.Builder(this)
@@ -343,6 +405,7 @@ public final class MainActivity extends Activity {
                     .setPositiveButton("Löschen", (d, which) -> {
                         if (isActive) AlarmScheduler.cancel(this);
                         store.delete(spot.id);
+                        ParkingWidget.updateAll(this);
                         showTab(TAB_HISTORY);
                     }).show());
             margin(content, item, 14);
@@ -369,7 +432,7 @@ public final class MainActivity extends Activity {
         LinearLayout privacy = card();
         line(privacy, "DATENSCHUTZ", 12, ACCENT, true, 0);
         line(privacy, "Kein Konto. Kein Tracking. Keine Werbung.", 17, WHITE, true, 7);
-        line(privacy, "Deine Parkplatzdaten bleiben in der lokalen SQLite-Datenbank. Für Kartenausschnitte werden Kacheln von OpenStreetMap geladen. Für externe Navigation verlässt du die App.",
+        line(privacy, "Deine Parkplatzdaten bleiben in der lokalen SQLite-Datenbank. Für Kartenausschnitte werden Kacheln von OpenStreetMap geladen. Bei Auswahl einer Straßenroute wird eine externe Karten-App geöffnet.",
                 14, MUTED, false, 8);
         actionLine(privacy, "Benachrichtigungen erlauben", false, this::askNotifications);
         actionLine(privacy, "App-Berechtigungen öffnen", false, () -> {
@@ -378,7 +441,7 @@ public final class MainActivity extends Activity {
             startActivity(intent);
         });
         margin(content, privacy, 16);
-        line(content, "ROYALPARK 0.1.0  ·  Eigenständiger Neubau", 12, MUTED, false, 25);
+        line(content, "ROYALPARK 0.2.0  ·  Eigenständiger Neubau", 12, MUTED, false, 25);
     }
 
     private void ensureLocation(Runnable action) {
@@ -397,6 +460,7 @@ public final class MainActivity extends Activity {
                 if (location == null) { error(error); return; }
                 ParkingSpot spot = store.save(location.getLatitude(), location.getLongitude(), "", "MANUAL");
                 AlarmScheduler.cancel(this);
+                ParkingWidget.updateAll(this);
                 deviceLocation = location;
                 toast("Parkplatz gespeichert");
                 showTab(TAB_MAP);
@@ -428,6 +492,7 @@ public final class MainActivity extends Activity {
                 .setView(wrap).setNegativeButton("Abbrechen", null)
                 .setPositiveButton("Speichern", (d, which) -> {
                     store.setNote(spot.id, input.getText().toString().trim());
+                    ParkingWidget.updateAll(this);
                     showTab(currentTab);
                 }).show();
     }
@@ -441,21 +506,56 @@ public final class MainActivity extends Activity {
                     .setPositiveButton("Berechtigung anfordern", (d, w) -> askNotifications()).show();
             return;
         }
-        String[] choices = {"30 Minuten", "60 Minuten", "90 Minuten", "2 Stunden", "3 Stunden", "Timer ausschalten"};
-        final long[] durations = {30, 60, 90, 120, 180, 0};
+        String[] choices = {"15 Minuten", "30 Minuten", "60 Minuten", "90 Minuten",
+                "2 Stunden", "3 Stunden", "Eigene Dauer …", "Timer ausschalten"};
+        final long[] durations = {15, 30, 60, 90, 120, 180};
         new AlertDialog.Builder(this).setTitle("Parkuhr einstellen")
                 .setItems(choices, (dialog, which) -> {
-                    long at = durations[which] == 0 ? 0
-                            : System.currentTimeMillis() + durations[which] * 60_000L;
-                    store.setTimer(spot.id, at);
-                    AlarmScheduler.schedule(this, spot.id, at);
-                    toast(at == 0 ? "Timer beendet" : "Erinnerung eingestellt (ungefähre Uhrzeit)");
-                    showTab(currentTab);
+                    if (which == 6) { customTimer(spot); return; }
+                    setTimerMinutes(spot, which == 7 ? 0 : durations[which]);
                 }).show();
+    }
+
+    private void customTimer(ParkingSpot spot) {
+        EditText minutes = new EditText(this);
+        minutes.setInputType(InputType.TYPE_CLASS_NUMBER);
+        minutes.setHint("Minuten (1–1440)");
+        minutes.setSingleLine(true);
+        LinearLayout wrap = column();
+        wrap.setPadding(dp(20), dp(4), dp(20), 0);
+        wrap.addView(minutes);
+        new AlertDialog.Builder(this).setTitle("Eigene Parkdauer")
+                .setView(wrap)
+                .setNegativeButton("Abbrechen", null)
+                .setPositiveButton("Einstellen", (dialog, which) -> {
+                    try {
+                        long value = Long.parseLong(minutes.getText().toString().trim());
+                        if (value < 1 || value > 1440) {
+                            error("Bitte 1 bis 1440 Minuten eingeben.");
+                        } else setTimerMinutes(spot, value);
+                    } catch (NumberFormatException ex) { error("Bitte eine gültige Zahl eingeben."); }
+                }).show();
+    }
+
+    private void setTimerMinutes(ParkingSpot spot, long minutes) {
+        long at = minutes == 0 ? 0 : System.currentTimeMillis() + minutes * 60_000L;
+        store.setTimer(spot.id, at);
+        AlarmScheduler.schedule(this, spot.id, at);
+        ParkingWidget.updateAll(this);
+        toast(at == 0 ? "Timer beendet" : "Erinnerung eingestellt (ungefähre Uhrzeit)");
+        showTab(currentTab);
     }
 
     private void photo(ParkingSpot spot) {
         photoSpotId = spot.id;
+        new AlertDialog.Builder(this)
+                .setTitle("Parkplatzfoto")
+                .setItems(new String[]{"Foto aufnehmen", "Aus Galerie auswählen"}, (dialog, which) -> {
+                    if (which == 0) takePhoto(); else choosePhoto();
+                }).show();
+    }
+
+    private void choosePhoto() {
         Intent intent = new Intent(Intent.ACTION_OPEN_DOCUMENT);
         intent.addCategory(Intent.CATEGORY_OPENABLE);
         intent.setType("image/*");
@@ -464,11 +564,38 @@ public final class MainActivity extends Activity {
         startActivityForResult(intent, REQ_PHOTO);
     }
 
+    private void takePhoto() {
+        try {
+            File folder = getExternalFilesDir(Environment.DIRECTORY_PICTURES);
+            if (folder == null) { error("Fotospeicher nicht verfügbar."); return; }
+            File file = File.createTempFile("royalpark_", ".jpg", folder);
+            pendingCameraFile = file.getAbsolutePath();
+            pendingCameraUri = FileProvider.getUriForFile(this,
+                    getPackageName() + ".fileprovider", file);
+            Intent intent = new Intent(MediaStore.ACTION_IMAGE_CAPTURE);
+            intent.putExtra(MediaStore.EXTRA_OUTPUT, pendingCameraUri);
+            intent.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION
+                    | Intent.FLAG_GRANT_WRITE_URI_PERMISSION);
+            if (intent.resolveActivity(getPackageManager()) == null) {
+                file.delete();
+                pendingCameraFile = null;
+                pendingCameraUri = null;
+                error("Keine Kamera-App installiert.");
+                return;
+            }
+            startActivityForResult(intent, REQ_CAMERA);
+        } catch (IOException | IllegalArgumentException ex) {
+            error("Kamera konnte nicht geöffnet werden.");
+        }
+    }
+
     private void navigate(ParkingSpot spot) {
-        String url = String.format(Locale.US,
-                "https://www.google.com/maps/dir/?api=1&destination=%.6f%%2C%.6f&travelmode=walking",
-                spot.latitude, spot.longitude);
-        openUrl(url);
+        ensureLocation(() -> {
+            Intent intent = new Intent(this, NavigateActivity.class);
+            intent.putExtra("latitude", spot.latitude);
+            intent.putExtra("longitude", spot.longitude);
+            startActivity(intent);
+        });
     }
 
     private void share(ParkingSpot spot) {
@@ -574,14 +701,26 @@ public final class MainActivity extends Activity {
 
     @Override protected void onActivityResult(int requestCode, int resultCode, Intent data) {
         super.onActivityResult(requestCode, resultCode, data);
-        if (requestCode == REQ_PHOTO && resultCode == RESULT_OK && data != null
-                && data.getData() != null && photoSpotId > 0) {
-            Uri uri = data.getData();
-            try { getContentResolver().takePersistableUriPermission(uri,
-                    Intent.FLAG_GRANT_READ_URI_PERMISSION); }
-            catch (SecurityException ignored) { /* Display may work for this session. */ }
-            store.setPhoto(photoSpotId, uri.toString());
-            showTab(currentTab);
+        if (requestCode == REQ_PHOTO) {
+            if (resultCode == RESULT_OK && data != null
+                    && data.getData() != null && photoSpotId > 0) {
+                Uri uri = data.getData();
+                try { getContentResolver().takePersistableUriPermission(uri,
+                        Intent.FLAG_GRANT_READ_URI_PERMISSION); }
+                catch (SecurityException ignored) { }
+                store.setPhoto(photoSpotId, uri.toString());
+                showTab(currentTab);
+            }
+            photoSpotId = -1;
+        } else if (requestCode == REQ_CAMERA) {
+            if (resultCode == RESULT_OK && pendingCameraUri != null && photoSpotId > 0) {
+                store.setPhoto(photoSpotId, pendingCameraUri.toString());
+                showTab(currentTab);
+            } else if (pendingCameraFile != null) {
+                new File(pendingCameraFile).delete();
+            }
+            pendingCameraUri = null;
+            pendingCameraFile = null;
             photoSpotId = -1;
         }
     }

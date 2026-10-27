@@ -16,6 +16,22 @@
         android:roundIcon="@drawable/ic_royalpark"
         android:theme="@style/Theme.RoyalPark"
         android:supportsRtl="true">
+        <activity android:name=".NavigateActivity" android:exported="false" />
+        <provider
+            android:name="androidx.core.content.FileProvider"
+            android:authorities="${applicationId}.fileprovider"
+            android:exported="false"
+            android:grantUriPermissions="true">
+            <meta-data android:name="android.support.FILE_PROVIDER_PATHS"
+                android:resource="@xml/file_paths" />
+        </provider>
+        <receiver android:name=".ParkingWidget" android:exported="true">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE"/>
+            </intent-filter>
+            <meta-data android:name="android.appwidget.provider"
+                android:resource="@xml/parking_widget"/>
+        </receiver>
         <activity
             android:name=".MainActivity"
             android:exported="true"

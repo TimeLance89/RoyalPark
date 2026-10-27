@@ -1,32 +1,20 @@
-# Roadmap – RoyalPark
+# RoyalPark – Parität zur Referenz-App
 
-## M0: Funktionaler eigener Kern (implementiert, Build/Device-Test offen)
-- GPS-Parken, Verlauf, eigener Name und Design
-- OSM-Karte, Notiz, Bild, Link und Fußweg-Navigation
-- Benachrichtigungs-Parkuhr und Bluetooth-Foreground-Service
+## Fertig im Quellcode
+- Aktuelle Position speichern; manuelle Pin-Wahl auf Karte
+- Verlauf / Notizen / Fotos (Kamera und Galerie) / Teilen
+- In-App-Kompass & Karte mit Luftlinienführung; externe Fußweg-Routen
+- Parkuhr (Presets und benutzerdefiniert)
+- Bluetooth-Automatik (Opt-in); aktiver Parkplatz im Widget
+- Lokale Datenbank und automatischer GitHub-APK-Build
 
-## M1: Gerätetest und Qualität (nächste Priorität)
-- Android-Build in CI ausführen, Compiler-/Lintfehler beheben
-- Installation auf Android 15/Xiaomi 12T; Standortberechtigungen testen
-- Gegenprüfen: Bluetooth-Auto trennt, GPS-Fix, Hintergrundbetrieb/Doze
-- Timer-Zuverlässigkeit, Foto-URI nach Neustart, Rotation, Accessibility
-- Datenmigrationen und Export/Import-Backup
+## Noch nicht originalgleich / nächster Ausbau
+- Echte interne Fußwegrouten-Berechnung und Sprachausgabe
+- Bewegungs-/Aktivitätserkennung als alternative Auto-Park-Methode (und kombinierte Erkennung)
+- Originalgetreue Einstellungsseiten/Onboarding (Referenzscreenshots erforderlich)
+- Offlinekarten mit regelkonformem Kartenprovider
+- Weitere Widget-Größen, Wear OS, Parkhausmodus
+- Geräterealtests auf HyperOS/Android 15, Akkuoptimierung, Berechtigungen und Rotation
+- Langfristig: Automatisierte UI-Tests, Datenexport/Import, mehrere Fahrzeuge, Kartenbibliothekswechsel
 
-## M2: Eigene Navigation & moderne Karten
-- MapLibre statt archiviertem osmdroid
-- Routendarstellung & Wegzeiten, Kompass und Distanz
-- Offline-Maps nur von rechtlich/vertraglich geeigneten Quellen
-- Parkhausmodus mit Etage/Foto und manueller Pin-Korrektur
-
-## M3: Intelligente Autopark-Erkennung
-- Bluetooth + Activity Recognition kombinieren, Fehlalarme reduzieren
-- Optionale Verzögerung/Konfidenz und Standortqualität anzeigen
-- Android-Boot- und OEM-Energiesparverhalten absichern
-- Widgets/Quick-Settings/optional Wear OS
-
-## M4: RoyalPark als langfristiges eigenes Produkt
-- Vollständiges Designsystem, Tests und CI/CD
-- Backup/Sync optional und Ende-zu-Ende-verschlüsselt
-- Mehrere Fahrzeuge, Erinnerungen, intelligente Orte, eigene Features
-
-Nicht vorgesehen: fremden Code oder Grafiken kopieren, Zahl-/Lizenzprüfungen umgehen.
+Kein Fremdquellcode, keine fremden Grafiken, kein Lizenz-/Aboumgehungscode.

@@ -69,6 +69,7 @@ public final class AutoParkService extends Service {
                         store.save(location.getLatitude(), location.getLongitude(),
                                 "Automatisch über Bluetooth gespeichert", "BLUETOOTH");
                         prefs.edit().putLong("last_auto_at", System.currentTimeMillis()).apply();
+                        ParkingWidget.updateAll(AutoParkService.this);
                         NotificationManager manager = getSystemService(NotificationManager.class);
                         if (manager != null) manager.notify(903,
                                 ParkingAlarmReceiver.notification(AutoParkService.this,
