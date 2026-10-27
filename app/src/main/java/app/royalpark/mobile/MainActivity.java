@@ -19,7 +19,7 @@ import android.os.Environment;
 import android.provider.MediaStore;
 import android.text.InputType;
 import androidx.core.content.FileProvider;
-import org.osmdroid.events.MapEventsOverlay;
+import org.osmdroid.views.overlay.MapEventsOverlay;
 import org.osmdroid.events.MapEventsReceiver;
 import java.io.File;
 import java.io.IOException;
