@@ -1,4 +1,4 @@
-# RoyalPark – unabhängige Android-Parkplatz-App (v0.2.0)
+# RoyalPark – unabhängige Android-Parkplatz-App (v0.3.0)
 
 Eigenständige, deutschsprachige Neuentwicklung anhand der Funktionsanalyse von „Mein Auto finden“ 1.1.15. Fremde APK-Ressourcen oder dekompilierter Programmcode wurden nicht übernommen.
 
@@ -29,3 +29,6 @@ Push nach main oder feature/* startet GitHub Actions. Artefakt \`RoyalPark-v0.1-
 \`MainActivity\`: Karte, Verlauf, Einstellungen; \`NavigateActivity\`: integrierte Live-Richtungsanzeige; \`ParkingStore\`: lokale SQLite-Daten; \`AutoParkService\`: Bluetooth-Überwachung; \`ParkingWidget\`: Widget; \`NavigationMath\`: reine Mathematik mit Tests.
 
 Android Studio: JDK 17, Gradle 8.11.1, compileSdk 35, targetSdk 35. Der Gradle-Wrapper ist noch nicht enthalten.
+
+## UI 0.3.0
+Die Oberfläche folgt nun der originalen hellen, kartenbasierten Navigation aus den offiziellen Store-Bildern: Fullscreen-OSM-Karte, schwebende Schaltflächen und weißes Parkplatz-Bottom-Sheet. Noch nicht pixelgenau auf einem realen Testgerät verifiziert.

@@ -56,12 +56,14 @@ import java.util.Set;
  * It contains none of the third-party application's source code, assets or identifiers.
  */
 public final class MainActivity extends Activity {
-    private static final int BG = Color.rgb(16, 21, 30);
-    private static final int CARD = Color.rgb(27, 36, 48);
-    private static final int CARD_BRIGHT = Color.rgb(35, 48, 62);
-    private static final int ACCENT = Color.rgb(86, 215, 193);
-    private static final int WHITE = Color.rgb(244, 249, 251);
-    private static final int MUTED = Color.rgb(162, 179, 190);
+    // Light map-first visual language, guided by screenshots of reference version 1.1.15.
+    private static final int BG = Color.rgb(247, 249, 251);
+    private static final int CARD = Color.WHITE;
+    private static final int CARD_BRIGHT = Color.rgb(235, 246, 250);
+    private static final int ACCENT = Color.rgb(88, 196, 213);
+    private static final int ACCENT_DARK = Color.rgb(29, 146, 171);
+    private static final int WHITE = Color.rgb(30, 48, 62);
+    private static final int MUTED = Color.rgb(104, 122, 137);
     private static final int REQ_LOCATION = 100;
     private static final int REQ_BT = 101;
     private static final int REQ_NOTIFICATIONS = 102;
@@ -76,6 +78,7 @@ public final class MainActivity extends Activity {
     private LinearLayout mainRoot;
     private FrameLayout body;
     private LinearLayout bottomBar;
+    private LinearLayout headerView;
     private MapView map;
     private Location deviceLocation;
     private Runnable afterPermission;
@@ -88,7 +91,8 @@ public final class MainActivity extends Activity {
         super.onCreate(state);
         getWindow().setStatusBarColor(BG);
         getWindow().setNavigationBarColor(BG);
-        getWindow().getDecorView().setSystemUiVisibility(0);
+        getWindow().getDecorView().setSystemUiVisibility(
+                View.SYSTEM_UI_FLAG_LIGHT_STATUS_BAR | View.SYSTEM_UI_FLAG_LIGHT_NAVIGATION_BAR);
         store = new ParkingStore(this);
         if (state != null) {
             photoSpotId = state.getLong("photoSpotId", -1);
@@ -180,6 +184,7 @@ public final class MainActivity extends Activity {
     private LinearLayout card() {
         LinearLayout view = column();
         view.setBackground(shape(CARD, 20));
+        view.setElevation(dp(3));
         view.setPadding(dp(18), dp(17), dp(18), dp(17));
         return view;
     }
@@ -195,7 +200,7 @@ public final class MainActivity extends Activity {
     }
 
     private TextView action(String caption, boolean primary, Runnable task) {
-        TextView button = text(caption, 15, primary ? BG : WHITE, true);
+        TextView button = text(caption, 15, primary ? Color.WHITE : ACCENT_DARK, true);
         button.setGravity(Gravity.CENTER);
         button.setPadding(dp(16), dp(13), dp(16), dp(13));
         button.setBackground(shape(primary ? ACCENT : CARD_BRIGHT, 14));
@@ -208,18 +213,21 @@ public final class MainActivity extends Activity {
     }
 
     private void header() {
-        LinearLayout header = row();
-        header.setPadding(dp(20), dp(15), dp(20), dp(16));
-        LinearLayout texts = column();
-        texts.addView(text("ROYALPARK", 13, ACCENT, true));
-        TextView heading = text("Dein Auto. Dein Weg.", 22, WHITE, true);
-        margin(texts, heading, 3);
-        header.addView(texts, new LinearLayout.LayoutParams(0, -2, 1));
-        TextView insignia = text("P", 22, ACCENT, true);
-        insignia.setGravity(Gravity.CENTER);
-        insignia.setBackground(shape(CARD_BRIGHT, 16));
-        header.addView(insignia, new LinearLayout.LayoutParams(dp(48), dp(48)));
-        mainRoot.addView(header);
+        headerView = row();
+        headerView.setBackgroundColor(CARD);
+        headerView.setPadding(dp(20), dp(13), dp(20), dp(13));
+        TextView back = text("‹", 34, ACCENT_DARK, false);
+        back.setGravity(Gravity.CENTER);
+        back.setOnClickListener(v -> showTab(TAB_MAP));
+        headerView.addView(back, new LinearLayout.LayoutParams(dp(40), dp(43)));
+        TextView heading = text("RoyalPark", 20, WHITE, true);
+        heading.setGravity(Gravity.CENTER);
+        headerView.addView(heading, new LinearLayout.LayoutParams(0, dp(43), 1));
+        TextView map = text("⌖", 25, ACCENT_DARK, true);
+        map.setGravity(Gravity.CENTER);
+        map.setOnClickListener(v -> showTab(TAB_MAP));
+        headerView.addView(map, new LinearLayout.LayoutParams(dp(40), dp(43)));
+        mainRoot.addView(headerView);
     }
 
     private void showTab(int tab) {
@@ -230,15 +238,20 @@ public final class MainActivity extends Activity {
             map = null;
         }
         body.removeAllViews();
+        headerView.setVisibility(tab == TAB_MAP ? View.GONE : View.VISIBLE);
+        bottomBar.setVisibility(tab == TAB_MAP ? View.GONE : View.VISIBLE);
+        if (tab == TAB_MAP) {
+            showFullMap();
+            return;
+        }
         ScrollView scroll = new ScrollView(this);
         scroll.setFillViewport(true);
         scroll.setClipToPadding(false);
         LinearLayout content = column();
-        content.setPadding(dp(16), dp(6), dp(16), dp(20));
+        content.setPadding(dp(16), dp(8), dp(16), dp(26));
         scroll.addView(content);
-        body.addView(scroll);
-        if (tab == TAB_MAP) showMap(content);
-        else if (tab == TAB_HISTORY) showHistory(content);
+        body.addView(scroll, new FrameLayout.LayoutParams(-1, -1));
+        if (tab == TAB_HISTORY) showHistory(content);
         else showSettings(content);
         bottomBar.removeAllViews();
         nav("⌖", "Karte", TAB_MAP);
@@ -247,7 +260,8 @@ public final class MainActivity extends Activity {
     }
 
     private void nav(String symbol, String label, int tab) {
-        TextView item = text(symbol + "\n" + label, 13, currentTab == tab ? ACCENT : MUTED, currentTab == tab);
+        TextView item = text(symbol + "\n" + label, 13,
+                currentTab == tab ? ACCENT_DARK : MUTED, currentTab == tab);
         item.setGravity(Gravity.CENTER);
         item.setLineSpacing(dp(3), 1f);
         item.setPadding(dp(2), dp(8), dp(2), dp(8));
@@ -255,69 +269,69 @@ public final class MainActivity extends Activity {
         bottomBar.addView(item, new LinearLayout.LayoutParams(0, dp(58), 1));
     }
 
-    private void showMap(LinearLayout content) {
+    private TextView floatingButton(String symbol, int textSize, Runnable action) {
+        TextView v = text(symbol, textSize, ACCENT_DARK, true);
+        v.setGravity(Gravity.CENTER);
+        v.setBackground(shape(Color.WHITE, 40));
+        v.setElevation(dp(7));
+        v.setOnClickListener(view -> action.run());
+        return v;
+    }
+
+    private FrameLayout.LayoutParams floatingAt(int w, int h, int gravity,
+            int left, int top, int right, int bottom) {
+        FrameLayout.LayoutParams p = new FrameLayout.LayoutParams(dp(w), dp(h), gravity);
+        p.setMargins(dp(left), dp(top), dp(right), dp(bottom));
+        return p;
+    }
+
+    private TextView quickAction(String icon, String label, Runnable click) {
+        TextView result = text(icon + "\n" + label, 12, WHITE, false);
+        result.setGravity(Gravity.CENTER);
+        result.setLineSpacing(dp(6), 1f);
+        result.setBackground(shape(CARD_BRIGHT, 13));
+        result.setOnClickListener(v -> click.run());
+        return result;
+    }
+
+    private void threeActions(LinearLayout sheet, TextView one, TextView two, TextView three) {
+        LinearLayout row = row();
+        LinearLayout.LayoutParams p1 = new LinearLayout.LayoutParams(0, dp(70), 1);
+        p1.rightMargin = dp(7);
+        LinearLayout.LayoutParams p2 = new LinearLayout.LayoutParams(0, dp(70), 1);
+        p2.setMargins(dp(2), 0, dp(2), 0);
+        LinearLayout.LayoutParams p3 = new LinearLayout.LayoutParams(0, dp(70), 1);
+        p3.leftMargin = dp(7);
+        row.addView(one, p1);
+        row.addView(two, p2);
+        row.addView(three, p3);
+        margin(sheet, row, 11);
+    }
+
+    /** Full-screen, map-first layout with the reference app's light bottom-sheet structure. */
+    private void showFullMap() {
         ParkingSpot active = store.active();
-        LinearLayout status = card();
-        line(status, active == null ? "NOCH KEIN PARKPLATZ" : "AKTUELLER PARKPLATZ", 12, ACCENT, true, 0);
-        line(status, active == null ? "Wo steht dein Auto?" : "Dein Auto wartet hier.", 24, WHITE, true, 8);
-        if (active == null) {
-            line(status, "Speichere deinen Standort beim Aussteigen.", 14, MUTED, false, 8);
-        } else {
-            line(status, format(active.parkedAt), 14, MUTED, false, 7);
-            line(status, String.format(Locale.GERMANY, "%.5f, %.5f", active.latitude, active.longitude),
-                    13, MUTED, false, 5);
-            if (!active.note.isEmpty()) line(status, "Notiz: " + active.note, 14, WHITE, false, 8);
-            if (active.timerAt > 0) line(status, "Parkuhr: " + format(active.timerAt), 14, ACCENT, true, 8);
-        }
-        actionLine(status, "＋  Standort jetzt speichern", true, this::saveCurrent);
-        if (deviceLocation != null && deviceLocation.hasAccuracy()) {
-            line(status, "GPS-Genauigkeit: ±" + Math.round(deviceLocation.getAccuracy()) + " m",
-                    12, MUTED, false, 8);
-        }
-        if (active != null) {
-            actionLine(status, "↗  Zu meinem Auto navigieren", false, () -> navigate(active));
-            LinearLayout tools = row();
-            TextView note = action("Notiz", false, () -> editNote(active));
-            TextView timer = action("Parkuhr", false, () -> timer(active));
-            LinearLayout.LayoutParams halves = new LinearLayout.LayoutParams(0, -2, 1);
-            halves.rightMargin = dp(5);
-            LinearLayout.LayoutParams second = new LinearLayout.LayoutParams(0, -2, 1);
-            second.leftMargin = dp(5);
-            tools.addView(note, halves);
-            tools.addView(timer, second);
-            margin(status, tools, 10);
-            LinearLayout small = row();
-            TextView photo = action("Foto", false, () -> photo(active));
-            TextView share = action("Teilen", false, () -> share(active));
-            LinearLayout.LayoutParams p = new LinearLayout.LayoutParams(0, -2, 1);
-            p.rightMargin = dp(5);
-            LinearLayout.LayoutParams q = new LinearLayout.LayoutParams(0, -2, 1);
-            q.leftMargin = dp(5);
-            small.addView(photo, p);
-            small.addView(share, q);
-            margin(status, small, 10);
-        }
-        content.addView(status);
-        line(content, "KARTE · Lange auf die Karte tippen, um einen Punkt zu speichern",
-                12, MUTED, true, 20);
-        FrameLayout frame = new FrameLayout(this);
-        frame.setBackground(shape(CARD_BRIGHT, 20));
+        FrameLayout canvas = new FrameLayout(this);
+        canvas.setBackgroundColor(BG);
+        body.addView(canvas, new FrameLayout.LayoutParams(-1, -1));
+
         map = new MapView(this);
         map.setTileSource(new XYTileSource("OSM", 0, 19, 256, ".png",
                 new String[]{"https://tile.openstreetmap.org/"}));
         map.setMultiTouchControls(true);
-        // Allow gestures inside the scrollable dashboard without parent interception.
-        map.setOnTouchListener((v, event) -> {
-            v.getParent().requestDisallowInterceptTouchEvent(true);
-            return false;
-        });
+        map.getController().setZoom(active != null || deviceLocation != null ? 16.8 : 5.5);
+        GeoPoint destination = active != null
+                ? new GeoPoint(active.latitude, active.longitude)
+                : deviceLocation != null
+                ? new GeoPoint(deviceLocation.getLatitude(), deviceLocation.getLongitude())
+                : new GeoPoint(51.1657, 10.4515);
+        map.getController().setCenter(destination);
         map.getOverlays().add(new MapEventsOverlay(new MapEventsReceiver() {
             @Override public boolean singleTapConfirmedHelper(GeoPoint point) { return false; }
             @Override public boolean longPressHelper(GeoPoint point) {
                 new AlertDialog.Builder(MainActivity.this)
                         .setTitle("Parkplatz hier speichern?")
-                        .setMessage("Den Punkt " + String.format(Locale.GERMANY, "%.5f, %.5f",
-                                point.getLatitude(), point.getLongitude()) + " als Parkplatz markieren?")
+                        .setMessage("Den markierten Standort übernehmen?")
                         .setNegativeButton("Abbrechen", null)
                         .setPositiveButton("Speichern", (dialog, which) -> {
                             ParkingSpot spot = store.save(point.getLatitude(), point.getLongitude(), "", "MAP");
@@ -329,46 +343,109 @@ public final class MainActivity extends Activity {
                 return true;
             }
         }));
-        map.getController().setZoom(active != null ? 16.7 : 5.7);
-        map.getController().setCenter(active != null
-                ? new GeoPoint(active.latitude, active.longitude)
-                : deviceLocation != null
-                ? new GeoPoint(deviceLocation.getLatitude(), deviceLocation.getLongitude())
-                : new GeoPoint(51.1657, 10.4515));
         if (active != null) {
             Marker parked = new Marker(map);
+            parked.setPosition(new GeoPoint(active.latitude, active.longitude));
             parked.setTitle("Mein Parkplatz");
             parked.setSnippet(active.note);
-            parked.setPosition(new GeoPoint(active.latitude, active.longitude));
             parked.setAnchor(Marker.ANCHOR_CENTER, Marker.ANCHOR_BOTTOM);
             map.getOverlays().add(parked);
         }
-        frame.addView(map, new FrameLayout.LayoutParams(-1, dp(310)));
-        TextView attribution = text("© OpenStreetMap-Mitwirkende", 11, BG, false);
-        attribution.setPadding(dp(8), dp(4), dp(8), dp(4));
-        attribution.setBackground(shape(Color.argb(225, 255, 255, 255), 6));
-        FrameLayout.LayoutParams attrParams = new FrameLayout.LayoutParams(-2, -2,
-                Gravity.BOTTOM | Gravity.RIGHT);
-        attrParams.setMargins(0, 0, dp(9), dp(9));
-        frame.addView(attribution, attrParams);
-        attribution.setOnClickListener(v -> openUrl("https://www.openstreetmap.org/copyright"));
-        LinearLayout.LayoutParams mapParams = new LinearLayout.LayoutParams(-1, dp(310));
-        mapParams.topMargin = dp(9);
-        content.addView(frame, mapParams);
-        actionLine(content, "⌖  Meinen Standort auf Karte zeigen", false, this::showMyLocation);
-        if (active != null && !active.photoUri.isEmpty()) {
-            line(content, "PARKFOTO", 12, MUTED, true, 22);
-            try {
-                ImageView image = new ImageView(this);
-                image.setImageURI(Uri.parse(active.photoUri));
-                image.setScaleType(ImageView.ScaleType.CENTER_CROP);
-                LinearLayout.LayoutParams photoParams = new LinearLayout.LayoutParams(-1, dp(170));
-                photoParams.topMargin = dp(8);
-                content.addView(image, photoParams);
-            } catch (Exception ignored) {
-                line(content, "Foto konnte nicht angezeigt werden.", 13, MUTED, false, 8);
-            }
+        canvas.addView(map, new FrameLayout.LayoutParams(-1, -1));
+
+        TextView settings = floatingButton("⚙", 24, () -> showTab(TAB_SETTINGS));
+        canvas.addView(settings, floatingAt(47, 47, Gravity.TOP | Gravity.LEFT, 17, 17, 0, 0));
+        TextView layers = floatingButton("▱ Karte", 15, () -> {
+            new AlertDialog.Builder(this)
+                    .setTitle("Kartenansicht")
+                    .setMessage("Standardkarte von OpenStreetMap. Halte die Karte gedrückt, um einen Parkplatz zu markieren.")
+                    .setPositiveButton("OK", null).show();
+        });
+        canvas.addView(layers, floatingAt(98, 47, Gravity.TOP | Gravity.RIGHT, 0, 17, 17, 0));
+
+        TextView history = floatingButton("◷", 25, () -> showTab(TAB_HISTORY));
+        canvas.addView(history, floatingAt(47, 47, Gravity.TOP | Gravity.LEFT, 17, 76, 0, 0));
+
+        if (deviceLocation != null && deviceLocation.hasAccuracy()) {
+            TextView gps = text("GPS ±" + Math.round(deviceLocation.getAccuracy()) + " m", 12, ACCENT_DARK, true);
+            gps.setPadding(dp(12), 0, dp(12), 0);
+            gps.setGravity(Gravity.CENTER);
+            gps.setBackground(shape(Color.WHITE, 18));
+            gps.setElevation(dp(3));
+            canvas.addView(gps, floatingAt(108, 32, Gravity.TOP | Gravity.LEFT, 17, 137, 0, 0));
         }
+
+        LinearLayout sheet = card();
+        sheet.setBackground(shape(Color.WHITE, 24));
+        sheet.setElevation(dp(12));
+        sheet.setPadding(dp(17), dp(14), dp(17), dp(17));
+        if (active == null) {
+            line(sheet, "MEIN PARKPLATZ", 12, ACCENT_DARK, true, 0);
+            line(sheet, "Wo steht dein Auto?", 23, WHITE, true, 7);
+            line(sheet, "Tippe auf Speichern, sobald du geparkt hast.", 13, MUTED, false, 7);
+            actionLine(sheet, "＋  Parkplatz speichern", true, this::saveCurrent);
+            actionLine(sheet, "⌖  Meinen Standort anzeigen", false, this::showMyLocation);
+        } else {
+            LinearLayout headline = row();
+            LinearLayout heading = column();
+            line(heading, "PARKPLATZ", 11, ACCENT_DARK, true, 0);
+            line(heading, "Dein Auto steht hier", 21, WHITE, true, 5);
+            line(heading, format(active.parkedAt), 12, MUTED, false, 5);
+            headline.addView(heading, new LinearLayout.LayoutParams(0, -2, 1));
+            TextView close = text("⋯", 28, MUTED, true);
+            close.setGravity(Gravity.CENTER);
+            close.setOnClickListener(v -> new AlertDialog.Builder(this)
+                    .setItems(new String[]{"Parkplatz neu speichern", "Verlauf öffnen"}, (d, selected) -> {
+                        if (selected == 0) saveCurrent(); else showTab(TAB_HISTORY);
+                    }).show());
+            headline.addView(close, new LinearLayout.LayoutParams(dp(42), dp(42)));
+            sheet.addView(headline);
+            if (deviceLocation != null && deviceLocation.hasAccuracy()) {
+                line(sheet, "Standortgenauigkeit  ±" + Math.round(deviceLocation.getAccuracy()) + " m",
+                        12, ACCENT_DARK, false, 9);
+            }
+            if (!active.note.isEmpty()) line(sheet, active.note, 13, MUTED, false, 7);
+            if (active.timerAt > 0) line(sheet, "Parkuhr bis " + format(active.timerAt),
+                    13, ACCENT_DARK, true, 7);
+            threeActions(sheet,
+                    quickAction("➤", "Route", () -> navigate(active)),
+                    quickAction("◷", "Parkuhr", () -> timer(active)),
+                    quickAction("▤", "Notiz", () -> editNote(active)));
+            threeActions(sheet,
+                    quickAction("▣", "Foto", () -> photo(active)),
+                    quickAction("↗", "Teilen", () -> share(active)),
+                    quickAction("＋", "Neu parken", this::saveCurrent));
+        }
+        FrameLayout.LayoutParams sheetParams = new FrameLayout.LayoutParams(
+                -1, -2, Gravity.BOTTOM | Gravity.CENTER_HORIZONTAL);
+        sheetParams.setMargins(dp(12), 0, dp(12), dp(14));
+        canvas.addView(sheet, sheetParams);
+
+        TextView myPosition = floatingButton("◎", 29, this::showMyLocation);
+        canvas.addView(myPosition, floatingAt(51, 51, Gravity.RIGHT | Gravity.BOTTOM,
+                0, 0, 18, active == null ? 247 : 304));
+
+        // Provider attribution must remain accessible above the floating sheet.
+        TextView attribution = text("© OpenStreetMap-Mitwirkende", 11, WHITE, false);
+        attribution.setGravity(Gravity.CENTER);
+        attribution.setPadding(dp(6), dp(3), dp(6), dp(3));
+        attribution.setBackground(shape(Color.argb(220, 255, 255, 255), 5));
+        attribution.setOnClickListener(v -> openUrl("https://www.openstreetmap.org/copyright"));
+        canvas.addView(attribution, floatingAt(190, 27, Gravity.BOTTOM | Gravity.LEFT,
+                12, 0, 0, active == null ? 260 : 318));
+        canvas.post(this::showInitialPosition);
+    }
+
+    private void showInitialPosition() {
+        if (currentTab != TAB_MAP || deviceLocation != null || store.active() != null) return;
+        if (!LocationGateway.hasPermission(this)) return;
+        LocationGateway.once(this, (location, error) -> {
+            if (location != null && currentTab == TAB_MAP && map != null) {
+                deviceLocation = location;
+                map.getController().animateTo(new GeoPoint(location.getLatitude(), location.getLongitude()));
+                map.getController().setZoom(16.5);
+            }
+        });
     }
 
     private void showHistory(LinearLayout content) {
@@ -441,7 +518,7 @@ public final class MainActivity extends Activity {
             startActivity(intent);
         });
         margin(content, privacy, 16);
-        line(content, "ROYALPARK 0.2.0  ·  Eigenständiger Neubau", 12, MUTED, false, 25);
+        line(content, "ROYALPARK 0.3.0  ·  Eigenständiger Neubau", 12, MUTED, false, 25);
     }
 
     private void ensureLocation(Runnable action) {
