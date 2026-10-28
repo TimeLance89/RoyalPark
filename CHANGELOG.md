@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.7.0 · 28. Oktober 2026
+- Schnellere Positionierung mit letzter ausreichend frischer Systemposition, danach Aktualisierung mit frischem Fix
+- Netzwerk-Fallback 1,2 s statt 8 s, Timeout 12 statt 20 s
+- Echtes GPS-Fadenkreuz und visuelle Statusanzeige, eigene Standortmarkierung
+- Import legaler Offline-Rasterkarten (.mbtiles/.sqlite/.zip) in privaten App-Speicher
+- Reiner Offline-Kartenmodus ohne Kachel-Netzwerkzugriff; automatische Offlinenutzung bei Verbindungsverlust
+- Einstellungen zum Wechsel und Löschen der Offline-Karte
+- Keine Vorabdownloads von OSM-Kacheln; Online-Fußwegrouting bleibt weiterhin Internet-abhängig
+
 ## 0.6.0 · 28. Oktober 2026
 - Eigene Felder für Parkhaus-Ebene und Stellplatz, SQLite-Migration v1→v2
 - ZIP-Export/-Import über Android-Dokumentenauswahl samt zugänglichen Parkplatzfotos

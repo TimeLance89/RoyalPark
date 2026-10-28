@@ -153,6 +153,7 @@ public final class NavigateActivity extends Activity
         map = new MapView(this);
         map.setTileSource(new XYTileSource("OSM", 0, 19, 256, ".png",
                 new String[]{"https://tile.openstreetmap.org/"}));
+        OfflineMaps.apply(this, map);
         map.setMultiTouchControls(true);
         map.getController().setZoom(16.5);
         map.getController().setCenter(new GeoPoint(targetLat, targetLon));
@@ -206,6 +207,13 @@ public final class NavigateActivity extends Activity
 
     private void askBeforeRouting() {
         if (loading) return;
+        if (OfflineMaps.enabled(this)) {
+            new AlertDialog.Builder(this)
+                    .setTitle("Offlinekarten aktiv")
+                    .setMessage("Der importierte Kartenbestand funktioniert ohne Internet. Eine neu berechnete Fußwegroute benötigt weiterhin einen Routingdienst im Internet. Der Richtungspfeil ist offline verfügbar.")
+                    .setPositiveButton("Verstanden", null).show();
+            return;
+        }
         if (current == null) {
             toast("Zuerst muss dein Standort bestimmt werden.");
             return;

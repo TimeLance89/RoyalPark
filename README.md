@@ -1,4 +1,4 @@
-# RoyalPark – unabhängige Android-Parkplatz-App (v0.6.0)
+# RoyalPark – unabhängige Android-Parkplatz-App (v0.7.0)
 
 RoyalPark ist eine eigenständige Android-App mit eigenem Quellcode. Die Funktionen orientieren sich an der von dir bereitgestellten Parkplatz-App, aber wir verwenden weder deren Programmcode noch geschützte App-Ressourcen.
 
@@ -45,3 +45,17 @@ Unter **Einstellungen → Datensicherung** können Parkplätze über den Android
 - Keine allgemeinen Speicherrechte nötig (Android-Dokumentenauswahl).
 - **Achtung:** Die GitHub-Debug-Signatur ist noch nicht dauerhaft festgelegt. Sichere die Daten vor einer Deinstallation, um Datenverlust zu vermeiden.
 - Geräte-Ende-zu-Ende-Tests für Backups, Bildformate und Android-Migration stehen noch aus.
+
+
+## 0.7.0: Schnell-Ortung und Offlinekarten
+- Standorttaste mit echtem GPS-Fadenkreuz-Icon und Suchstatus.
+- Systemposition mit max. 120 Sekunden Alter und max. 250 m Genauigkeit wird sofort zentriert, danach folgt ein frischer GPS-/Netzwerk-Fix.
+- Netzwerk-Standort wird schon nach 1,2 Sekunden statt acht Sekunden ergänzend angefragt; Timeout 12 statt 20 Sekunden.
+- Für das dauerhafte Speichern eines Parkplatzes wird weiterhin ein neuer Standort abgefragt.
+- Unter Einstellungen -> Offline-Karten kannst du lizenzierte Rasterkarten (.mbtiles, .sqlite, .zip) über den Android-Dateidialog importieren (max. 1 GB pro Archiv).
+- Offline-Modus nutzt ausschließlich die importierte Karte und lädt keine Netzwerkkacheln. Bei fehlendem Internet erfolgt ein automatischer Wechsel auf das importierte Kartenarchiv.
+- Ohne Offline-Archiv sind eventuell zuvor gesehene Kacheln aus dem Cache sichtbar, aber kein vollständiges Kartenmaterial.
+- Kartendarstellung, gespeicherte Parkplätze und Kompass funktionieren ohne Internet. Eine neue Valhalla-Fußwegroute benötigt weiterhin Internet.
+- Es werden keine Kartenkacheln auf Vorrat von tile.openstreetmap.org heruntergeladen; der Betreiber untersagt dieses Offline-Prefetching.
+- Importierte Rasterkarten zeigen nur Regionen und Zoomstufen, die tatsächlich enthalten sind.
+- Offene Tests: HyperOS-Standortzeiten, Dateiformate und Navigation auf einem echten Android-Gerät.

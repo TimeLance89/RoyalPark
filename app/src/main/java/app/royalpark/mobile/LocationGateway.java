@@ -10,6 +10,7 @@ import android.os.Build;
 import android.os.CancellationSignal;
 import android.os.Handler;
 import android.os.Looper;
+import android.os.SystemClock;
 
 import java.util.concurrent.atomic.AtomicBoolean;
 
@@ -21,6 +22,37 @@ public final class LocationGateway {
     public static boolean hasPermission(Context context) {
         return context.checkSelfPermission(Manifest.permission.ACCESS_FINE_LOCATION) == PackageManager.PERMISSION_GRANTED
                 || context.checkSelfPermission(Manifest.permission.ACCESS_COARSE_LOCATION) == PackageManager.PERMISSION_GRANTED;
+    }
+
+    /**
+     * Best recent fix from Android's provider cache; it is never written as a parking location
+     * and is only suitable for centering the map. Invalid or inaccurate fixes are rejected.
+     */
+    public static Location recent(Context context, long maxAgeMillis, float maxAccuracyMeters) {
+        if (!hasPermission(context)) return null;
+        LocationManager manager = context.getSystemService(LocationManager.class);
+        if (manager == null) return null;
+        boolean fine = context.checkSelfPermission(Manifest.permission.ACCESS_FINE_LOCATION)
+                == PackageManager.PERMISSION_GRANTED;
+        Location candidate = null;
+        String[] providers = fine
+                ? new String[]{LocationManager.GPS_PROVIDER, LocationManager.NETWORK_PROVIDER}
+                : new String[]{LocationManager.NETWORK_PROVIDER};
+        long now = SystemClock.elapsedRealtimeNanos();
+        for (String provider : providers) {
+            try {
+                Location location = manager.getLastKnownLocation(provider);
+                if (location == null || !location.hasAccuracy()
+                        || location.getAccuracy() > maxAccuracyMeters
+                        || !Double.isFinite(location.getLatitude())
+                        || !Double.isFinite(location.getLongitude())) continue;
+                long age = (now - location.getElapsedRealtimeNanos()) / 1_000_000L;
+                if (age < 0 || age > maxAgeMillis) continue;
+                if (candidate == null || location.getAccuracy() < candidate.getAccuracy())
+                    candidate = location;
+            } catch (SecurityException | IllegalArgumentException ignored) { }
+        }
+        return candidate;
     }
 
     public static void once(Context context, Callback callback) {
@@ -64,7 +96,7 @@ public final class LocationGateway {
         };
         try {
             request(manager, context, primary, gpsSignal, result, legacy, 0);
-            // An indoor location may have no GPS fix. Fall back to fresh network positioning.
+            // Indoor GPS may be slow; request a fresh network fix after a short grace period.
             if (gps && network) main.postDelayed(() -> {
                 if (!completed.get()) {
                     try {
@@ -72,7 +104,7 @@ public final class LocationGateway {
                                 networkSignal, result, legacy, 1);
                     } catch (Exception ignored) { }
                 }
-            }, 8_000L);
+            }, 1_200L);
             main.postDelayed(() -> {
                 if (completed.compareAndSet(false, true)) {
                     gpsSignal.cancel();
@@ -80,9 +112,9 @@ public final class LocationGateway {
                     for (LocationListener listener : legacy) if (listener != null) {
                         try { manager.removeUpdates(listener); } catch (Exception ignored) { }
                     }
-                    callback.onResult(null, "Zeitüberschreitung bei der Ortung. Bitte erneut versuchen.");
+                    callback.onResult(null, "Noch kein genauer Standort gefunden. Unter freiem Himmel erneut versuchen.");
                 }
-            }, 20_000L);
+            }, 12_000L);
         } catch (SecurityException ex) {
             if (completed.compareAndSet(false, true)) callback.onResult(null, "Keine Standortberechtigung");
         } catch (Exception ex) {

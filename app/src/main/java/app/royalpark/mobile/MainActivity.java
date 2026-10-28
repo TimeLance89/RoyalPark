@@ -33,6 +33,7 @@ import android.view.WindowInsets;
 import android.widget.EditText;
 import android.widget.FrameLayout;
 import android.widget.ImageView;
+import android.widget.ImageButton;
 import android.widget.LinearLayout;
 import android.widget.ScrollView;
 import android.widget.TextView;
@@ -74,6 +75,7 @@ public final class MainActivity extends Activity {
     private static final int REQ_MOTION = 105;
     private static final int REQ_BACKUP_CREATE = 106;
     private static final int REQ_BACKUP_IMPORT = 107;
+    private static final int REQ_OFFLINE_MAP = 108;
     private static final int TAB_MAP = 0;
     private static final int TAB_HISTORY = 1;
     private static final int TAB_SETTINGS = 2;
@@ -85,6 +87,10 @@ public final class MainActivity extends Activity {
     private LinearLayout bottomBar;
     private LinearLayout headerView;
     private MapView map;
+    private TextView locationStatus;
+    private ImageButton locationButton;
+    private Marker myLocationMarker;
+    private boolean locatingNow;
     private Location deviceLocation;
     private Runnable afterPermission;
     private long photoSpotId = -1;
@@ -333,6 +339,7 @@ public final class MainActivity extends Activity {
         map = new MapView(this);
         map.setTileSource(new XYTileSource("OSM", 0, 19, 256, ".png",
                 new String[]{"https://tile.openstreetmap.org/"}));
+        boolean offline = OfflineMaps.apply(this, map);
         map.setMultiTouchControls(true);
         map.getController().setZoom(active != null || deviceLocation != null ? 16.8 : 5.5);
         GeoPoint destination = active != null
@@ -358,6 +365,14 @@ public final class MainActivity extends Activity {
                 return true;
             }
         }));
+        myLocationMarker = new Marker(map);
+        myLocationMarker.setTitle("Mein Standort");
+        myLocationMarker.setAnchor(Marker.ANCHOR_CENTER, Marker.ANCHOR_BOTTOM);
+        if (deviceLocation != null) {
+            myLocationMarker.setPosition(new GeoPoint(
+                    deviceLocation.getLatitude(), deviceLocation.getLongitude()));
+            map.getOverlays().add(myLocationMarker);
+        }
         if (active != null) {
             Marker parked = new Marker(map);
             parked.setPosition(new GeoPoint(active.latitude, active.longitude));
@@ -370,11 +385,26 @@ public final class MainActivity extends Activity {
 
         TextView settings = floatingButton("⚙", 24, () -> showTab(TAB_SETTINGS));
         canvas.addView(settings, floatingAt(47, 47, Gravity.TOP | Gravity.LEFT, 17, 17, 0, 0));
-        TextView layers = floatingButton("▱ Karte", 15, () -> {
+        TextView layers = floatingButton(offline ? "Offline" : "Karte", 15, () -> {
             new AlertDialog.Builder(this)
                     .setTitle("Kartenansicht")
-                    .setMessage("Standardkarte von OpenStreetMap. Halte die Karte gedrückt, um einen Parkplatz zu markieren.")
-                    .setPositiveButton("OK", null).show();
+                    .setItems(new String[]{"Onlinekarte (Standard)",
+                                    "Offlinekarte verwenden",
+                                    "Offline-Kartenpaket importieren",
+                                    "Karteneinstellungen öffnen"}, (d, which) -> {
+                        if (which == 0) {
+                            OfflineMaps.setEnabled(this, false);
+                            showTab(TAB_MAP);
+                        } else if (which == 1) {
+                            if (!OfflineMaps.hasArchive(this)) {
+                                error("Bitte zuerst ein Offline-Kartenpaket importieren.");
+                            } else {
+                                OfflineMaps.setEnabled(this, true);
+                                showTab(TAB_MAP);
+                            }
+                        } else if (which == 2) importOfflineMap();
+                        else showTab(TAB_SETTINGS);
+                    }).show();
         });
         canvas.addView(layers, floatingAt(98, 47, Gravity.TOP | Gravity.RIGHT, 0, 17, 17, 0));
 
@@ -440,9 +470,26 @@ public final class MainActivity extends Activity {
         sheetParams.setMargins(dp(12), 0, dp(12), dp(14));
         canvas.addView(sheet, sheetParams);
 
-        TextView myPosition = floatingButton("◎", 29, this::showMyLocation);
-        canvas.addView(myPosition, floatingAt(51, 51, Gravity.RIGHT | Gravity.BOTTOM,
-                0, 0, 18, active == null ? 247 : 304));
+        locationButton = new ImageButton(this);
+        locationButton.setImageResource(R.drawable.ic_my_location);
+        locationButton.setColorFilter(ACCENT_DARK);
+        locationButton.setScaleType(ImageView.ScaleType.CENTER_INSIDE);
+        locationButton.setPadding(dp(12), dp(12), dp(12), dp(12));
+        locationButton.setContentDescription("Zu meinem Standort springen");
+        locationButton.setBackground(shape(Color.WHITE, 25));
+        locationButton.setElevation(dp(7));
+        locationButton.setOnClickListener(v -> showMyLocation());
+        int locationBottom = active == null ? 247 : 304;
+        canvas.addView(locationButton, floatingAt(51, 51, Gravity.RIGHT | Gravity.BOTTOM,
+                0, 0, 18, locationBottom));
+        locationStatus = text("", 12, WHITE, true);
+        locationStatus.setGravity(Gravity.CENTER);
+        locationStatus.setPadding(dp(10), dp(4), dp(10), dp(4));
+        locationStatus.setBackground(shape(Color.WHITE, 10));
+        locationStatus.setElevation(dp(4));
+        locationStatus.setVisibility(View.GONE);
+        canvas.addView(locationStatus, floatingAt(164, 31, Gravity.RIGHT | Gravity.BOTTOM,
+                0, 0, 80, locationBottom + 9));
 
         // Provider attribution must remain accessible above the floating sheet.
         TextView attribution = text("© OpenStreetMap-Mitwirkende", 11, WHITE, false);
@@ -458,13 +505,13 @@ public final class MainActivity extends Activity {
     private void showInitialPosition() {
         if (currentTab != TAB_MAP || deviceLocation != null || store.active() != null) return;
         if (!LocationGateway.hasPermission(this)) return;
-        LocationGateway.once(this, (location, error) -> {
-            if (location != null && currentTab == TAB_MAP && map != null) {
-                deviceLocation = location;
-                map.getController().animateTo(new GeoPoint(location.getLatitude(), location.getLongitude()));
-                map.getController().setZoom(16.5);
-            }
-        });
+        Location cached = LocationGateway.recent(this, 120_000L, 250f);
+        if (cached != null) {
+            jumpToLocation(cached, false);
+            return;
+        }
+        // The opening screen should not block on a GPS fix.
+        // The explicit location button starts a fresh fix on demand.
     }
 
     private void showHistory(LinearLayout content) {
@@ -556,6 +603,37 @@ public final class MainActivity extends Activity {
         line(backup, "Beim Import bleiben vorhandene Parkplätze erhalten. Alte Parkuhren werden aus Sicherheitsgründen nicht neu aktiviert.",
                 12, MUTED, false, 8);
         margin(content, backup, 16);
+        LinearLayout offlineCard = card();
+        line(offlineCard, "OFFLINE-KARTEN", 12, ACCENT_DARK, true, 0);
+        line(offlineCard, "Karte ohne Internet anzeigen", 18, WHITE, true, 7);
+        line(offlineCard, "Installiere ein lizenziertes Rasterkarten-Archiv (.mbtiles, .sqlite, .zip). RoyalPark lädt keine Kartengebiete vom öffentlichen OSM-Server herunter.",
+                13, MUTED, false, 8);
+        boolean installed = OfflineMaps.hasArchive(this);
+        line(offlineCard, installed
+                ? "Vorhandene Kartenquelle: " + OfflineMaps.sourceName(this)
+                : "Noch keine Offlinekarte importiert.", 13, MUTED, false, 7);
+        actionLine(offlineCard, "↓  Offline-Kartenpaket importieren", false, this::importOfflineMap);
+        actionLine(offlineCard, OfflineMaps.enabled(this) ? "✓  Offline-Modus ausschalten"
+                : "○  Offline-Modus einschalten", false, () -> {
+            if (!OfflineMaps.enabled(this) && !OfflineMaps.hasArchive(this)) {
+                error("Bitte zuerst ein Offline-Kartenpaket importieren.");
+                return;
+            }
+            OfflineMaps.setEnabled(this, !OfflineMaps.enabled(this));
+            showTab(TAB_SETTINGS);
+        });
+        if (installed) actionLine(offlineCard, "Offline-Kartenpaket entfernen", false,
+                () -> new AlertDialog.Builder(this)
+                        .setTitle("Offlinekarte entfernen?")
+                        .setMessage("Nur das importierte Kartenpaket wird gelöscht, deine Parkplätze bleiben erhalten.")
+                        .setNegativeButton("Abbrechen", null)
+                        .setPositiveButton("Entfernen", (d, w) -> {
+                            OfflineMaps.remove(this);
+                            showTab(TAB_SETTINGS);
+                        }).show());
+        line(offlineCard, "Offlinekarte = nur Kartendarstellung. Für die berechnete Fußwegroute ist weiterhin Internet notwendig.",
+                12, MUTED, false, 10);
+        margin(content, offlineCard, 16);
         LinearLayout privacy = card();
         line(privacy, "DATENSCHUTZ", 12, ACCENT, true, 0);
         line(privacy, "Kein Konto. Kein Tracking. Keine Werbung.", 17, WHITE, true, 7);
@@ -568,7 +646,7 @@ public final class MainActivity extends Activity {
             startActivity(intent);
         });
         margin(content, privacy, 16);
-        line(content, "ROYALPARK 0.6.0  ·  Eigenständiger Neubau", 12, MUTED, false, 25);
+        line(content, "ROYALPARK 0.7.0  ·  Eigenständiger Neubau", 12, MUTED, false, 25);
     }
 
     private void ensureLocation(Runnable action) {
@@ -597,14 +675,95 @@ public final class MainActivity extends Activity {
     }
 
     private void showMyLocation() {
-        ensureLocation(() -> LocationGateway.once(this, (location, error) -> {
-            if (location == null) { error(error); return; }
-            deviceLocation = location;
-            if (map != null) {
-                map.getController().animateTo(new GeoPoint(location.getLatitude(), location.getLongitude()));
-                map.getController().setZoom(17.0);
+        ensureLocation(() -> {
+            if (locatingNow) {
+                if (deviceLocation != null) jumpToLocation(deviceLocation, false);
+                return;
             }
-        }));
+            locatingNow = true;
+            if (locationButton != null) locationButton.setAlpha(0.55f);
+            setLocationStatus("Suche Standort …");
+            Location cached = LocationGateway.recent(this, 120_000L, 250f);
+            if (cached != null) {
+                jumpToLocation(cached, true);
+                setLocationStatus("Letzte Position …");
+            } else if (deviceLocation != null) {
+                // Don't display an old remembered position as if it were fresh.
+                setLocationStatus("GPS wird aktualisiert …");
+            }
+            LocationGateway.once(this, (location, error) -> {
+                locatingNow = false;
+                if (locationButton != null) locationButton.setAlpha(1f);
+                if (isFinishing() || isDestroyed()) return;
+                if (location == null) {
+                    if (cached == null) error(error);
+                    setLocationStatus(cached == null ? "Kein GPS-Fix" : "Nur letzte Position");
+                    return;
+                }
+                jumpToLocation(location, true);
+                String accuracy = location.hasAccuracy()
+                        ? "±" + Math.round(location.getAccuracy()) + " m"
+                        : "ermittelt";
+                setLocationStatus("Standort " + accuracy);
+            });
+        });
+    }
+
+    private void jumpToLocation(Location location, boolean animate) {
+        deviceLocation = location;
+        if (map == null || currentTab != TAB_MAP) return;
+        GeoPoint point = new GeoPoint(location.getLatitude(), location.getLongitude());
+        if (myLocationMarker == null) {
+            myLocationMarker = new Marker(map);
+            myLocationMarker.setTitle("Mein Standort");
+            myLocationMarker.setAnchor(Marker.ANCHOR_CENTER, Marker.ANCHOR_BOTTOM);
+        }
+        myLocationMarker.setPosition(point);
+        if (!map.getOverlays().contains(myLocationMarker)) map.getOverlays().add(myLocationMarker);
+        map.getController().setZoom(17.0);
+        if (animate) map.getController().animateTo(point);
+        else map.getController().setCenter(point);
+        map.invalidate();
+    }
+
+    private void setLocationStatus(String message) {
+        if (locationStatus == null) return;
+        locationStatus.setText(message);
+        locationStatus.setVisibility(View.VISIBLE);
+    }
+
+    private void importOfflineMap() {
+        Intent intent = new Intent(Intent.ACTION_OPEN_DOCUMENT);
+        intent.setType("*/*");
+        intent.addCategory(Intent.CATEGORY_OPENABLE);
+        try { startActivityForResult(intent, REQ_OFFLINE_MAP); }
+        catch (Exception ex) { error("Dateiauswahl nicht verfügbar."); }
+    }
+
+    private void installOfflineMap(Uri uri) {
+        toast("Offlinekarte wird geprüft und importiert …");
+        backupExecutor.execute(() -> {
+            try {
+                String source = OfflineMaps.importArchive(getApplicationContext(), uri);
+                runOnUiThread(() -> {
+                    if (isFinishing() || isDestroyed()) return;
+                    showTab(TAB_MAP);
+                    new AlertDialog.Builder(this)
+                            .setTitle("Offlinekarte installiert")
+                            .setMessage("Kartenquelle: " + source
+                                    + "\nDie Karte wird ohne Netzverbindung angezeigt, sofern das Archiv Kacheln für diese Region und Zoomstufe enthält. Online-Routing funktioniert dabei nicht.")
+                            .setPositiveButton("OK", null).show();
+                });
+            } catch (Exception failure) {
+                runOnUiThread(() -> {
+                    if (!isFinishing() && !isDestroyed())
+                        new AlertDialog.Builder(this)
+                                .setTitle("Kartenimport fehlgeschlagen")
+                                .setMessage(failure.getMessage())
+                                .setPositiveButton("OK", null).show();
+                });
+            }
+        });
     }
 
     private void editNote(ParkingSpot spot) {
@@ -991,6 +1150,11 @@ public final class MainActivity extends Activity {
 
     @Override protected void onActivityResult(int requestCode, int resultCode, Intent data) {
         super.onActivityResult(requestCode, resultCode, data);
+        if (requestCode == REQ_OFFLINE_MAP) {
+            if (resultCode == RESULT_OK && data != null && data.getData() != null)
+                installOfflineMap(data.getData());
+            return;
+        }
         if (requestCode == REQ_BACKUP_CREATE) {
             if (resultCode == RESULT_OK && data != null && data.getData() != null)
                 exportTo(data.getData());
