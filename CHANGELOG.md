@@ -1,5 +1,16 @@
 # Changelog
 
+## 1.4.1 · 28. Oktober 2026
+- Android-15-Systemleisten berücksichtigt: Navigationskopf überschneidet nicht mehr Uhr oder Statussymbole.
+- Navigations-Zielkarte kleiner und ruhiger; bei einfacher Luftliniennavigation nur eine kompakte Unterzeile.
+- Bei ungenauer GPS-Ortung mit einem Radius über 40 m: „Zielbereich“ statt vermeintlich exakten 13 m.
+- Keine falsche Ankunftsmeldung mehr: Nähe zum Auto wird nur bei präziser Standortfreigabe, maximal 12 m GPS-Unsicherheit und einer entsprechend präzisen gespeicherten Parkposition berücksichtigt.
+- Korrekte Übernahme des Genauigkeitsstatus des gespeicherten Parkplatzes in die Navigation.
+- Karten-Zoomtasten entfernt; Wisch- und Pinch-Gesten bleiben, nur ein kleiner Zentrierknopf bleibt sichtbar.
+- Im eingeklappten Aktionsfeld nur „Route berechnen“ und „Mehr“, weitere Optionen bei Bedarf.
+- Zusätzliche Unit-Tests für Standortunsicherheit und Annäherung; versionCode 18.
+- Reale UI- und Navigationsläufe auf Xiaomi noch zu prüfen.
+
 ## 1.4.0 · 28. Oktober 2026
 - Navigationsoberfläche vollständig neugestaltet: schmale obere App-Leiste, kompakte schwebende Zielkarte und großflächige Karte.
 - Keine permanenten großen Online-/Offline-Routingbalken mehr: ausklappbares Aktionsfenster mit Neu berechnen, Ansagen, Mehr, Routenauswahl, externer Karte und Beenden.
