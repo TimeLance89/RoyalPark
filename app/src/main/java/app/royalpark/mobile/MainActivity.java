@@ -480,6 +480,9 @@ public final class MainActivity extends Activity {
                     13, MUTED, false, 6);
             if (!spot.note.isEmpty()) line(item, spot.note, 14, WHITE, false, 5);
             actionLine(item, "↗  Navigation", false, () -> navigate(spot));
+            actionLine(item, spot.photoUri.isEmpty() ? "▣  Parkplatzfoto hinzufügen" : "▣  Parkplatzfoto verwalten",
+                    false, () -> photo(spot));
+            actionLine(item, "↗  Parkplatz teilen", false, () -> share(spot));
             actionLine(item, isActive ? "Aktueller Parkplatz ✓" : "Als aktuellen Parkplatz wählen", false, () -> {
                 store.setActiveId(spot.id);
                 ParkingWidget.updateAll(this);
@@ -785,6 +788,7 @@ public final class MainActivity extends Activity {
                         != PackageManager.PERMISSION_GRANTED) {
             afterPermission = () -> {
                 prefs.edit().putBoolean("motion_enabled", true).apply();
+                if (prefs.getBoolean("auto_enabled", false)) stopAuto();
                 showTab(TAB_SETTINGS);
                 toast("Bewegungserkennung aktiviert. Überwachung noch starten.");
             };
