@@ -1,5 +1,16 @@
 # Changelog
 
+## 1.4.0 · 28. Oktober 2026
+- Navigationsoberfläche vollständig neugestaltet: schmale obere App-Leiste, kompakte schwebende Zielkarte und großflächige Karte.
+- Keine permanenten großen Online-/Offline-Routingbalken mehr: ausklappbares Aktionsfenster mit Neu berechnen, Ansagen, Mehr, Routenauswahl, externer Karte und Beenden.
+- Zwei klar unterscheidbare Marker: türkises Autosymbol für den Parkplatz und blauer Punkt für die eigene Position.
+- Kleine Zoom- und Zentriersteuerung rechts über der Bedienfläche.
+- OSM-Quellenhinweis klein und oberhalb der variablen Höhe des Aktionsfensters, weiterhin anklickbar.
+- Keine irreführende Anzeige „0 Min“; Kurzstrecken verwenden „< 1 Min“; Distanz wird bei ungenauer Ortung als Schätzung gekennzeichnet.
+- Online-Routing fragt nach ausdrücklicher Zustimmung vor Standortweitergabe, Offline-Routing setzt weiterhin BRouter und .rd5-Daten voraus.
+- Neue Unit-Tests für kompakte Navigationsinformationen; versionCode 17, Datenbankschema unverändert.
+- Reales Geräte-UI/Rotation/Schriftgrößen und Online-/Offline-Routen weiterhin separat prüfen.
+
 ## 1.3.0 · 28. Oktober 2026
 - Karte und Kachelanbieter bleiben beim Wechsel zwischen Karte, Verlauf und Einstellungen erhalten – keine komplette Initialisierung bei jedem Tab-Wechsel.
 - Beim Zurückkehren aus der Navigation wird der bestehende Kartenaufbau wiederverwendet; bei geänderten Parkplatzdaten oder Kartenquelle erfolgt gezielter Neuaufbau.

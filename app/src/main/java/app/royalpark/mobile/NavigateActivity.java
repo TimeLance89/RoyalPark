@@ -6,6 +6,9 @@ import android.app.AlertDialog;
 import android.content.Intent;
 import android.content.pm.PackageManager;
 import android.graphics.Color;
+import android.graphics.drawable.GradientDrawable;
+import android.graphics.drawable.Drawable;
+import android.graphics.drawable.LayerDrawable;
 import android.graphics.Typeface;
 import android.hardware.GeomagneticField;
 import android.hardware.Sensor;
@@ -21,7 +24,9 @@ import android.os.SystemClock;
 import android.speech.tts.TextToSpeech;
 import android.view.Gravity;
 import android.view.View;
+import android.view.ViewGroup;
 import android.widget.FrameLayout;
+import android.widget.ImageButton;
 import android.widget.LinearLayout;
 import android.widget.TextView;
 import android.widget.Toast;
@@ -48,9 +53,9 @@ import java.util.concurrent.Executors;
  */
 public final class NavigateActivity extends Activity
         implements LocationListener, SensorEventListener {
-    private static final int BG = Color.rgb(247, 249, 251);
-    private static final int INK = Color.rgb(30, 48, 62);
-    private static final int TEAL = Color.rgb(29, 146, 171);
+    private static final int BG = Color.rgb(247, 250, 251);
+    private static final int INK = Color.rgb(22, 45, 56);
+    private static final int TEAL = Color.rgb(0, 139, 151);
     private static final int MUTED = Color.rgb(104, 122, 137);
     private static final int GRAY = Color.rgb(140, 153, 167);
     private final ExecutorService worker = Executors.newSingleThreadExecutor();
@@ -70,6 +75,14 @@ public final class NavigateActivity extends Activity
     private TextView offlineRouteButton;
     private boolean offlineRouteActive;
     private TextView speechButton;
+    private TextView recalculateButton;
+    private TextView modeText;
+    private TextView offlineModeButton;
+    private TextView onlineModeButton;
+    private TextView moreButton;
+    private LinearLayout secondaryControls;
+    private boolean selectedOffline;
+    private boolean controlsExpanded;
     private WalkingRouteService.Route route;
     private double targetLat;
     private double targetLon;
@@ -103,11 +116,52 @@ public final class NavigateActivity extends Activity
         Toast.makeText(this, value, Toast.LENGTH_LONG).show();
     }
 
+    private GradientDrawable background(int color, int radius, int borderColor) {
+        GradientDrawable d = new GradientDrawable();
+        d.setColor(color);
+        d.setCornerRadius(dp(radius));
+        if (borderColor != Color.TRANSPARENT) d.setStroke(dp(1), borderColor);
+        return d;
+    }
     private TextView action(String value, boolean primary) {
-        TextView view = label(value, 14, primary ? Color.WHITE : TEAL, true);
-        view.setBackgroundColor(primary ? TEAL : Color.WHITE);
-        view.setPadding(dp(12), dp(12), dp(12), dp(12));
+        TextView view = label(value, 14, primary ? Color.WHITE : INK, true);
+        view.setBackground(background(primary ? TEAL : 0xFFF1F6F7, 17, Color.TRANSPARENT));
+        view.setPadding(dp(10), dp(10), dp(10), dp(10));
+        view.setMinHeight(dp(46));
         return view;
+    }
+    private TextView smallAction(String title, Runnable click) {
+        TextView view = action(title, false);
+        view.setTextSize(13);
+        view.setOnClickListener(v -> click.run());
+        return view;
+    }
+    private void addRowItem(LinearLayout row, View child, int weight, int marginLeft) {
+        LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(0, dp(48), weight);
+        lp.leftMargin = dp(marginLeft);
+        row.addView(child, lp);
+    }
+    private void updateMode() {
+        if (modeText == null) return;
+        modeText.setText(offlineRouteActive && route != null ? "Offline-Route aktiv"
+                : route != null ? "Online-Route aktiv" :
+                  selectedOffline ? "Offline · BRouter" : "Online · Valhalla");
+        if (offlineModeButton != null)
+            offlineModeButton.setBackground(background(selectedOffline ? 0xFFE1F3F3 : 0xFFF5F7F8,
+                    15, selectedOffline ? 0xFFB4DEDF : Color.TRANSPARENT));
+        if (onlineModeButton != null)
+            onlineModeButton.setBackground(background(!selectedOffline ? 0xFFE1F3F3 : 0xFFF5F7F8,
+                    15, !selectedOffline ? 0xFFB4DEDF : Color.TRANSPARENT));
+    }
+    private void recalculate() {
+        if (selectedOffline) calculateOffline();
+        else askBeforeRouting();
+    }
+    private void setSheetExpanded(boolean expanded) {
+        controlsExpanded = expanded;
+        if (secondaryControls != null)
+            secondaryControls.setVisibility(expanded ? View.VISIBLE : View.GONE);
+        if (moreButton != null) moreButton.setText(expanded ? "Weniger" : "Mehr");
     }
 
     @Override public void onCreate(Bundle state) {
@@ -121,38 +175,27 @@ public final class NavigateActivity extends Activity
                 View.SYSTEM_UI_FLAG_LIGHT_STATUS_BAR | View.SYSTEM_UI_FLAG_LIGHT_NAVIGATION_BAR);
         MapPerformance.configure(this, getPreferences(MODE_PRIVATE));
 
+        // Compact app bar + full-height map. Guidance and actions float over the map
+        // instead of allocating two huge fixed panels above/below it.
         LinearLayout root = new LinearLayout(this);
-        root.setBackgroundColor(BG);
         root.setOrientation(LinearLayout.VERTICAL);
+        root.setBackgroundColor(BG);
         setContentView(root);
-
         LinearLayout top = new LinearLayout(this);
-        top.setPadding(dp(12), dp(8), dp(12), dp(8));
         top.setGravity(Gravity.CENTER_VERTICAL);
-        TextView back = label("‹  Zurück", 16, TEAL, true);
+        top.setBackgroundColor(Color.WHITE);
+        top.setPadding(dp(12), dp(3), dp(12), dp(3));
+        TextView back = label("‹ Zurück", 15, TEAL, true);
+        back.setContentDescription("Zurück zur Parkplatzkarte");
         back.setOnClickListener(v -> finish());
-        top.addView(back, new LinearLayout.LayoutParams(dp(98), dp(44)));
-        TextView title = label("Zum Parkplatz", 20, INK, true);
-        top.addView(title, new LinearLayout.LayoutParams(0, dp(44), 1));
-        root.addView(top);
-
-        LinearLayout compass = new LinearLayout(this);
-        compass.setGravity(Gravity.CENTER_VERTICAL);
-        compass.setPadding(dp(12), dp(4), dp(12), dp(4));
-        arrow = label("▲", 59, TEAL, true);
-        compass.addView(arrow, new LinearLayout.LayoutParams(dp(95), dp(90)));
-        LinearLayout detail = new LinearLayout(this);
-        detail.setOrientation(LinearLayout.VERTICAL);
-        distanceText = label("Standort wird ermittelt …", 22, INK, true);
-        detail.addView(distanceText);
-        routeDetails = label("Kompass zeigt die Luftlinie.", 12, MUTED, false);
-        detail.addView(routeDetails);
-        compass.addView(detail, new LinearLayout.LayoutParams(0, -2, 1));
-        root.addView(compass);
-
-        stepText = label("Fußwegroute optional berechnen – oder dem Richtungspfeil folgen.", 14, INK, false);
-        stepText.setPadding(dp(18), dp(7), dp(18), dp(12));
-        root.addView(stepText);
+        top.addView(back, new LinearLayout.LayoutParams(dp(88), dp(48)));
+        TextView title = label("Zum Parkplatz", 19, INK, true);
+        top.addView(title, new LinearLayout.LayoutParams(0, dp(48), 1));
+        TextView overflow = label("⋮", 25, TEAL, true);
+        overflow.setContentDescription("Weitere Navigationseinstellungen");
+        overflow.setOnClickListener(v -> setSheetExpanded(true));
+        top.addView(overflow, new LinearLayout.LayoutParams(dp(44), dp(48)));
+        root.addView(top, new LinearLayout.LayoutParams(-1, dp(54)));
 
         FrameLayout mapFrame = new FrameLayout(this);
         map = new MapView(this);
@@ -160,52 +203,184 @@ public final class NavigateActivity extends Activity
                 new String[]{"https://tile.openstreetmap.org/"}));
         OfflineMaps.apply(this, map);
         map.setMultiTouchControls(true);
-        map.getController().setZoom(16.5);
+        map.getController().setZoom(17.5);
         map.getController().setCenter(new GeoPoint(targetLat, targetLon));
         Marker carMarker = new Marker(map);
         carMarker.setTitle("Mein Auto");
+        carMarker.setIcon(getDrawable(R.drawable.ic_nav_car));
         carMarker.setPosition(new GeoPoint(targetLat, targetLon));
         carMarker.setAnchor(Marker.ANCHOR_CENTER, Marker.ANCHOR_BOTTOM);
         map.getOverlays().add(carMarker);
         pointerLine = new Polyline(map);
-        pointerLine.setColor(GRAY);
-        pointerLine.setWidth(dp(3));
+        pointerLine.setColor(0xFF9DB4BA);
+        pointerLine.setWidth(dp(2));
         map.getOverlays().add(pointerLine);
         routeLine = new Polyline(map);
         routeLine.setColor(TEAL);
-        routeLine.setWidth(dp(6));
+        routeLine.setWidth(dp(5));
         map.getOverlays().add(routeLine);
         myMarker = new Marker(map);
         myMarker.setTitle("Dein Standort");
-        myMarker.setAnchor(Marker.ANCHOR_CENTER, Marker.ANCHOR_BOTTOM);
+        myMarker.setIcon(getDrawable(R.drawable.ic_nav_location_dot));
+        myMarker.setAnchor(Marker.ANCHOR_CENTER, Marker.ANCHOR_CENTER);
         map.getOverlays().add(myMarker);
         mapFrame.addView(map, new FrameLayout.LayoutParams(-1, -1));
-        TextView credit = label("© OpenStreetMap-Mitwirkende", 10, INK, false);
-        credit.setPadding(dp(6), dp(3), dp(6), dp(3));
-        credit.setBackgroundColor(Color.WHITE);
-        FrameLayout.LayoutParams credits = new FrameLayout.LayoutParams(-2, -2,
-                Gravity.BOTTOM | Gravity.RIGHT);
-        credits.setMargins(0, 0, dp(5), dp(5));
-        mapFrame.addView(credit, credits);
-        credit.setOnClickListener(v -> startActivity(new Intent(Intent.ACTION_VIEW,
-                Uri.parse("https://www.openstreetmap.org/copyright"))));
         root.addView(mapFrame, new LinearLayout.LayoutParams(-1, 0, 1));
 
-        offlineRouteButton = action("⌁  Offline-Fußweg (BRouter)", true);
-        offlineRouteButton.setOnClickListener(v -> calculateOffline());
-        root.addView(offlineRouteButton, new LinearLayout.LayoutParams(-1, dp(47)));
-        routeButton = action("☁  Fußweg online berechnen", false);
-        routeButton.setOnClickListener(v -> askBeforeRouting());
-        root.addView(routeButton, new LinearLayout.LayoutParams(-1, dp(47)));
+        // Floating guidance card, concise even on small devices.
+        LinearLayout guidance = new LinearLayout(this);
+        guidance.setGravity(Gravity.CENTER_VERTICAL);
+        guidance.setPadding(dp(13), dp(10), dp(17), dp(10));
+        guidance.setBackground(background(Color.WHITE, 21, 0xFFE6EBEE));
+        guidance.setElevation(dp(5));
+        arrow = label("▲", 32, TEAL, true);
+        guidance.addView(arrow, new LinearLayout.LayoutParams(dp(55), dp(62)));
+        LinearLayout guidanceWords = new LinearLayout(this);
+        guidanceWords.setOrientation(LinearLayout.VERTICAL);
+        distanceText = label("Suche Standort …", 27, INK, true);
+        distanceText.setGravity(Gravity.START | Gravity.CENTER_VERTICAL);
+        guidanceWords.addView(distanceText);
+        routeDetails = label("Richtung zum Auto", 13, MUTED, false);
+        routeDetails.setGravity(Gravity.START | Gravity.CENTER_VERTICAL);
+        guidanceWords.addView(routeDetails);
+        stepText = label("Luftlinie", 12, MUTED, false);
+        stepText.setGravity(Gravity.START | Gravity.CENTER_VERTICAL);
+        stepText.setMaxLines(2);
+        guidanceWords.addView(stepText);
+        guidance.addView(guidanceWords, new LinearLayout.LayoutParams(0, -2, 1));
+        FrameLayout.LayoutParams guideParams = new FrameLayout.LayoutParams(
+                Math.min(dp(306), getResources().getDisplayMetrics().widthPixels - dp(32)),
+                -2, Gravity.TOP | Gravity.LEFT);
+        guideParams.setMargins(dp(14), dp(14), 0, 0);
+        mapFrame.addView(guidance, guideParams);
 
-        LinearLayout commands = new LinearLayout(this);
-        speechButton = action("🔇  Ansagen: Aus", false);
+        LinearLayout tools = new LinearLayout(this);
+        tools.setOrientation(LinearLayout.VERTICAL);
+        tools.setElevation(dp(5));
+        tools.setBackground(background(Color.WHITE, 19, Color.TRANSPARENT));
+        TextView zoomIn = smallAction("+", () -> map.getController().zoomIn());
+        zoomIn.setTextSize(24);
+        tools.addView(zoomIn, new LinearLayout.LayoutParams(dp(48), dp(47)));
+        View split = new View(this);
+        split.setBackgroundColor(0xFFE3ECEE);
+        tools.addView(split, new LinearLayout.LayoutParams(dp(48), dp(1)));
+        TextView zoomOut = smallAction("−", () -> map.getController().zoomOut());
+        zoomOut.setTextSize(26);
+        tools.addView(zoomOut, new LinearLayout.LayoutParams(dp(48), dp(47)));
+        FrameLayout.LayoutParams toolParams = new FrameLayout.LayoutParams(
+                dp(48), dp(95), Gravity.RIGHT | Gravity.BOTTOM);
+        toolParams.rightMargin = dp(13);
+        mapFrame.addView(tools, toolParams);
+        TextView follow = smallAction("⌖", () -> {
+            if (current == null) {
+                toast("Standort wird noch ermittelt.");
+            } else {
+                map.getController().animateTo(
+                        new GeoPoint(current.getLatitude(), current.getLongitude()));
+                map.getController().setZoom(18);
+            }
+        });
+        follow.setTextSize(24);
+        follow.setContentDescription("Meinen Standort zentrieren");
+        follow.setElevation(dp(5));
+        FrameLayout.LayoutParams followParams = new FrameLayout.LayoutParams(
+                dp(48), dp(48), Gravity.RIGHT | Gravity.BOTTOM);
+        followParams.rightMargin = dp(13);
+        mapFrame.addView(follow, followParams);
+
+        LinearLayout sheet = new LinearLayout(this);
+        sheet.setOrientation(LinearLayout.VERTICAL);
+        sheet.setPadding(dp(14), dp(8), dp(14), dp(14));
+        sheet.setBackground(background(Color.WHITE, 25, 0xFFE8EFF0));
+        sheet.setElevation(dp(9));
+        View grip = new View(this);
+        grip.setBackground(background(0xFFD7E1E3, 4, Color.TRANSPARENT));
+        LinearLayout.LayoutParams gp = new LinearLayout.LayoutParams(dp(37), dp(4));
+        gp.gravity = Gravity.CENTER_HORIZONTAL;
+        gp.bottomMargin = dp(10);
+        sheet.addView(grip, gp);
+        LinearLayout commandRow = new LinearLayout(this);
+        commandRow.setOrientation(LinearLayout.HORIZONTAL);
+        recalculateButton = action("⟳ Neu", true);
+        recalculateButton.setContentDescription("Gewählte Route neu berechnen");
+        recalculateButton.setOnClickListener(v -> recalculate());
+        addRowItem(commandRow, recalculateButton, 1.35f, 0);
+        speechButton = action("Ansagen aus", false);
         speechButton.setOnClickListener(v -> toggleSpeech());
-        commands.addView(speechButton, new LinearLayout.LayoutParams(0, dp(48), 1));
-        TextView external = action("↗  Externe Karte", false);
-        external.setOnClickListener(v -> openExternal());
-        commands.addView(external, new LinearLayout.LayoutParams(0, dp(48), 1));
-        root.addView(commands);
+        addRowItem(commandRow, speechButton, 1.25f, 8);
+        moreButton = action("Mehr", false);
+        moreButton.setOnClickListener(v -> setSheetExpanded(!controlsExpanded));
+        addRowItem(commandRow, moreButton, 0.8f, 8);
+        sheet.addView(commandRow);
+        modeText = label("Route wählen", 12, MUTED, false);
+        modeText.setPadding(dp(8), dp(8), 0, 0);
+        sheet.addView(modeText);
+
+        // Expanded options are hidden by default to give most of the height to the map.
+        secondaryControls = new LinearLayout(this);
+        secondaryControls.setOrientation(LinearLayout.VERTICAL);
+        LinearLayout modes = new LinearLayout(this);
+        offlineModeButton = smallAction("Offline · BRouter", () -> {
+            selectedOffline = true;
+            updateMode();
+        });
+        onlineModeButton = smallAction("Online", () -> {
+            selectedOffline = false;
+            updateMode();
+        });
+        addRowItem(modes, offlineModeButton, 1.5f, 0);
+        addRowItem(modes, onlineModeButton, 1, 8);
+        secondaryControls.addView(modes);
+        LinearLayout extras = new LinearLayout(this);
+        TextView external = smallAction("↗ Externe Karte", this::openExternal);
+        addRowItem(extras, external, 1, 0);
+        TextView end = smallAction("Navigation beenden", this::finish);
+        end.setTextColor(0xFFB54A56);
+        addRowItem(extras, end, 1.2f, 8);
+        LinearLayout.LayoutParams extraParams = new LinearLayout.LayoutParams(-1, -2);
+        extraParams.topMargin = dp(8);
+        secondaryControls.addView(extras, extraParams);
+        LinearLayout.LayoutParams secondaryParams = new LinearLayout.LayoutParams(-1, -2);
+        secondaryParams.topMargin = dp(8);
+        sheet.addView(secondaryControls, secondaryParams);
+        FrameLayout.LayoutParams bottomParams = new FrameLayout.LayoutParams(
+                -1, -2, Gravity.BOTTOM);
+        mapFrame.addView(sheet, bottomParams);
+        selectedOffline = OfflineWalkingRouter.isInstalled(this);
+        updateMode();
+        setSheetExpanded(false);
+
+        // Attribution always stays in the map and OUTSIDE the bottom sheet.
+        TextView credit = label("© OpenStreetMap-Mitwirkende", 10, MUTED, false);
+        credit.setPadding(dp(7), dp(3), dp(7), dp(3));
+        credit.setBackground(background(0xD9FFFFFF, 7, Color.TRANSPARENT));
+        credit.setContentDescription("OpenStreetMap-Lizenz öffnen");
+        credit.setOnClickListener(v -> startActivity(new Intent(Intent.ACTION_VIEW,
+                Uri.parse("https://www.openstreetmap.org/copyright"))));
+        FrameLayout.LayoutParams credits = new FrameLayout.LayoutParams(
+                -2, -2, Gravity.LEFT | Gravity.BOTTOM);
+        credits.leftMargin = dp(8);
+        mapFrame.addView(credit, credits);
+        Runnable reposition = () -> {
+            FrameLayout.LayoutParams creditParams = (FrameLayout.LayoutParams) credit.getLayoutParams();
+            creditParams.bottomMargin = sheet.getHeight() + dp(8);
+            credit.setLayoutParams(creditParams);
+            FrameLayout.LayoutParams tp = (FrameLayout.LayoutParams) tools.getLayoutParams();
+            tp.bottomMargin = sheet.getHeight() + dp(70);
+            tools.setLayoutParams(tp);
+            FrameLayout.LayoutParams fp = (FrameLayout.LayoutParams) follow.getLayoutParams();
+            fp.bottomMargin = sheet.getHeight() + dp(15);
+            follow.setLayoutParams(fp);
+        };
+        sheet.addOnLayoutChangeListener((v, l, t, r, b, oldL, oldT, oldR, oldB) -> {
+            if (b - t != oldB - oldT) reposition.run();
+        });
+        mapFrame.post(reposition);
+
+        // Referenced by existing routing callbacks. Visible selection controls
+        // remain separate from transient loading status.
+        offlineRouteButton = offlineModeButton;
+        routeButton = onlineModeButton;
 
         locations = getSystemService(LocationManager.class);
         sensors = getSystemService(SensorManager.class);
@@ -262,13 +437,13 @@ public final class NavigateActivity extends Activity
             return;
         }
         loading = true;
-        offlineRouteButton.setText("Berechne offline …");
+        recalculateButton.setText("Berechne …");
         stepText.setText("BRouter berechnet die Strecke direkt auf diesem Gerät.");
         boolean started = OfflineWalkingRouter.calculate(this, worker, current.getLatitude(),
                 current.getLongitude(), targetLat, targetLon, (result, error) -> {
                     if (isFinishing() || isDestroyed()) return;
                     loading = false;
-                    offlineRouteButton.setText("⟳  Offline-Fußweg neu berechnen");
+                    recalculateButton.setText("⟳ Neu");
                     if (result != null) displayRoute(result, true);
                     else {
                         stepText.setText("Keine Offline-Route – Kompass funktioniert weiterhin.");
@@ -277,7 +452,7 @@ public final class NavigateActivity extends Activity
                 });
         if (!started) {
             loading = false;
-            offlineRouteButton.setText("⌁  Offline-Fußweg (BRouter)");
+            recalculateButton.setText("⟳ Neu");
         }
     }
 
@@ -287,7 +462,7 @@ public final class NavigateActivity extends Activity
         final double startLon = current.getLongitude();
         lastRequestMs = System.currentTimeMillis();
         loading = true;
-        routeButton.setText("Route wird berechnet …");
+        recalculateButton.setText("Berechne …");
         stepText.setText("Online-Fußwegroute wird angefragt …");
         worker.execute(() -> {
             WalkingRouteService.Route response = null;
@@ -302,7 +477,7 @@ public final class NavigateActivity extends Activity
             runOnUiThread(() -> {
                 if (isFinishing() || isDestroyed()) return;
                 loading = false;
-                routeButton.setText("⟳  Online-Fußweg aktualisieren");
+                    recalculateButton.setText("⟳ Neu");
                 if (result == null) {
                     stepText.setText("Online-Routing nicht verfügbar – Kompass bleibt aktiv.");
                     routeDetails.setText(failure == null ? "Verbindung fehlgeschlagen" : failure);
@@ -316,18 +491,17 @@ public final class NavigateActivity extends Activity
     private void displayRoute(WalkingRouteService.Route result, boolean offline) {
         route = result;
         offlineRouteActive = offline;
+        selectedOffline = offline;
+        updateMode();
         routeProgressIndex = 0;
         lastSpokenStep = -1;
         List<GeoPoint> path = new ArrayList<>();
         for (RouteGeometry.Point p : result.coordinates) path.add(new GeoPoint(p.lat, p.lon));
         routeLine.setPoints(path);
         pointerLine.setPoints(new ArrayList<>());
-        routeDetails.setText(String.format(Locale.GERMANY,
-                "Fußweg: %.1f km · ca. %d Min · %s",
-                result.lengthKm, Math.round(result.durationSeconds / 60),
-                offline ? "Offline / BRouter" : "FOSSGIS / Valhalla"));
+        routeDetails.setText(NavigationPresentation.walkingDuration(result.durationSeconds));
         if (offline) {
-            stepText.setText("BRouter-Route bereit. Folge der türkisfarbenen Linie; offline sind keine Abbiegetexte verfügbar.");
+            stepText.setText("Folge der markierten Route");
         }
         if (!path.isEmpty()) {
             double north = -90, south = 90, west = 180, east = -180;
@@ -350,7 +524,7 @@ public final class NavigateActivity extends Activity
 
     private void toggleSpeech() {
         voiceEnabled = !voiceEnabled;
-        speechButton.setText(voiceEnabled ? "🔊  Ansagen: An" : "🔇  Ansagen: Aus");
+        speechButton.setText(voiceEnabled ? "Ansagen an" : "Ansagen aus");
         if (!voiceEnabled) {
             if (speaker != null) speaker.stop();
             return;
@@ -444,15 +618,16 @@ public final class NavigateActivity extends Activity
         if (current == null || map == null) return;
         double distance = NavigationMath.distanceMeters(current.getLatitude(),
                 current.getLongitude(), targetLat, targetLon);
-        distanceText.setText(NavigationMath.formatDistance(distance));
+        distanceText.setText(NavigationPresentation.distanceText(distance,
+                current.hasAccuracy() ? current.getAccuracy() : Float.NaN));
         updateArrow();
         GeoPoint me = new GeoPoint(current.getLatitude(), current.getLongitude());
         myMarker.setPosition(me);
 
         if (route == null) {
             pointerLine.setPoints(Arrays.asList(me, new GeoPoint(targetLat, targetLon)));
-            if (distance < 20) stepText.setText("Du bist beim Auto angekommen.");
-            else stepText.setText("Kompass-Richtung: Luftlinie (keine Straßenroute).");
+            if (distance < 20) stepText.setText("Beim Auto angekommen");
+            else stepText.setText("Luftlinie · Route optional");
             if (!cameraCentered) {
                 cameraCentered = true;
                 map.zoomToBoundingBox(new BoundingBox(
@@ -475,7 +650,7 @@ public final class NavigateActivity extends Activity
         double offRoute = NavigationMath.distanceMeters(current.getLatitude(), current.getLongitude(),
                 nearPoint.lat, nearPoint.lon);
         if (offRoute > 110) {
-            stepText.setText("Du bist von der Route abgewichen. Route manuell aktualisieren.");
+            stepText.setText("Abseits der Route · neu berechnen");
             return;
         }
         routeProgressIndex = Math.max(routeProgressIndex, nearest);
@@ -487,13 +662,11 @@ public final class NavigateActivity extends Activity
             }
         }
         if (route.steps.isEmpty()) {
-            stepText.setText(offlineRouteActive
-                    ? "Offline-Fußweg eingezeichnet. Folge der türkisen Route."
-                    : "Fußweg eingezeichnet. Folge der türkisen Route.");
+            stepText.setText("Folge der eingezeichneten Route");
             return;
         }
         WalkingRouteService.Step step = route.steps.get(stepNumber);
-        stepText.setText(step.instruction);
+        stepText.setText(NavigationPresentation.briefInstruction(step.instruction));
         RouteGeometry.Point stepPoint = route.coordinates.get(step.shapeIndex);
         double nextDistance = NavigationMath.distanceMeters(current.getLatitude(),
                 current.getLongitude(), stepPoint.lat, stepPoint.lon);
@@ -502,7 +675,7 @@ public final class NavigateActivity extends Activity
             speak(step.instruction);
         }
         if (NavigationMath.distanceMeters(current.getLatitude(), current.getLongitude(),
-                targetLat, targetLon) < 18) stepText.setText("Du bist beim Auto angekommen.");
+                targetLat, targetLon) < 18) stepText.setText("Beim Auto angekommen");
     }
 
     @Override public void onAccuracyChanged(Sensor sensor, int accuracy) {}

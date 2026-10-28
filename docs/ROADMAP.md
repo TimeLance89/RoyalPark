@@ -66,3 +66,8 @@ Kein Fremdquellcode, keine fremden Grafiken, kein Lizenz-/Aboumgehungscode.
 - Erledigt: Kompassberechnung gedrosselt, Magnetausgleich wiederverwenden.
 - Offen: Frame-Metriken auf realen Telefonen, große Offline-Vektorkarten benchmarken, gezielter Kartenrenderer-Vergleich.
 - Offen: eventuell performantere Vektor-Engine evaluieren. Kein Wechsel ohne Android-Gerätevergleich.
+
+## 1.4.0 – Navigation
+- Kompakte Orientierungskarte, Map-First Layout, ausklappbare Aktionsleiste, getrennte Standort-/Auto-Symbole.
+- Offen: echte Karten-Routen-Interaktion und kleine Displays auf Android/HyperOS testen.
+- Offen: barrierefreie TalkBack-Beschreibungen und erneute Anpassung bei großen Schriftgrößen.

@@ -51,3 +51,9 @@ Die wichtigste Veränderung ist der Lebenszyklus der Karte:
 - Die Navigation verwendet denselben Cache. Rotationssensor-Aktualisierung max. ca. **12,5 Hz** und magnetische Deklination max. einmal pro Minute, statt bei jedem Sensorereignis neu zu berechnen.
 - Keine weiteren Berechtigungen, keine Datenübertragung durch die Optimierung, keine Datenbankmigration.
 - **Prüfen:** Auf einem echten Xiaomi/HyperOS-Gerät müssen Scroll-Framerate, Kartengröße und Speicherauslastung getestet werden. Ein CI-Build misst keine tatsächliche 60-FPS-Leistung. Neue Regionen müssen vor dem ersten flüssigen Schwenken teilweise neu gerendert werden.
+
+
+## 1.4.0: Navigation neu gedacht
+Das eigene Navigationsfenster wurde neu gebaut: große Karte mit kompakter schwebender Zielkarte, klaren Markern (Auto = Türkis mit Pkw, eigener Standort = blau), kleineren Kartencontrols und einem zunächst zugeklappten unteren Bedienfeld. Über `Mehr` werden Online-/Offline-Moduswahl, externe Karte und Navigation beenden sichtbar.
+Die Kartenquelle bleibt sichtbar und verlinkt weiterhin OpenStreetMap. Die Online-Routenberechnung benötigt die ausdrückliche Zustimmung zur einmaligen Weitergabe der beiden Standorte; offline nutzt RoyalPark weiterhin die separat installierte BRouter-App mit geladenen Routingsegmenten.
+Texte: unter 60 Sekunden verbleibender Dauer wird `< 1 Min · zu Fuß` dargestellt. Androids gemeldete Ortsungenauigkeit wird bei >50 m durch ein `≈` vor der Entfernung gekennzeichnet. Reale Layouttests auf Xiaomi sind weiterhin nötig.
