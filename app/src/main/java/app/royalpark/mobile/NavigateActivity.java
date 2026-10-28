@@ -20,12 +20,15 @@ import android.location.LocationListener;
 import android.location.LocationManager;
 import android.net.Uri;
 import android.os.Bundle;
+import android.os.Build;
 import android.os.SystemClock;
 import android.speech.tts.TextToSpeech;
 import android.view.Gravity;
+import android.view.WindowInsets;
 import android.view.View;
 import android.view.ViewGroup;
 import android.widget.FrameLayout;
+import android.text.TextUtils;
 import android.widget.ImageButton;
 import android.widget.LinearLayout;
 import android.widget.TextView;
@@ -83,6 +86,7 @@ public final class NavigateActivity extends Activity
     private LinearLayout secondaryControls;
     private boolean selectedOffline;
     private boolean controlsExpanded;
+    private boolean parkingApproximate;
     private WalkingRouteService.Route route;
     private double targetLat;
     private double targetLon;
@@ -169,6 +173,7 @@ public final class NavigateActivity extends Activity
         targetLat = getIntent().getDoubleExtra("latitude", Double.NaN);
         targetLon = getIntent().getDoubleExtra("longitude", Double.NaN);
         if (!ParkingLogic.validCoordinates(targetLat, targetLon)) { finish(); return; }
+        parkingApproximate = getIntent().getBooleanExtra("parking_approximate", false);
         getWindow().setStatusBarColor(BG);
         getWindow().setNavigationBarColor(BG);
         getWindow().getDecorView().setSystemUiVisibility(
@@ -180,22 +185,31 @@ public final class NavigateActivity extends Activity
         LinearLayout root = new LinearLayout(this);
         root.setOrientation(LinearLayout.VERTICAL);
         root.setBackgroundColor(BG);
+        // On Android 15, the status/navigation bars are edge-to-edge.
+        if (Build.VERSION.SDK_INT >= 35) {
+            root.setOnApplyWindowInsetsListener((view, insets) -> {
+                android.graphics.Insets bars = insets.getInsets(WindowInsets.Type.systemBars());
+                root.setPadding(bars.left, bars.top, bars.right, bars.bottom);
+                return insets;
+            });
+        }
         setContentView(root);
         LinearLayout top = new LinearLayout(this);
         top.setGravity(Gravity.CENTER_VERTICAL);
         top.setBackgroundColor(Color.WHITE);
-        top.setPadding(dp(12), dp(3), dp(12), dp(3));
-        TextView back = label("‹ Zurück", 15, TEAL, true);
+        top.setPadding(dp(10), 0, dp(10), 0);
+        TextView back = label("‹", 29, TEAL, true);
         back.setContentDescription("Zurück zur Parkplatzkarte");
         back.setOnClickListener(v -> finish());
-        top.addView(back, new LinearLayout.LayoutParams(dp(88), dp(48)));
-        TextView title = label("Zum Parkplatz", 19, INK, true);
+        top.addView(back, new LinearLayout.LayoutParams(dp(46), dp(48)));
+        TextView title = label("Zum Auto", 18, INK, true);
+        title.setGravity(Gravity.START | Gravity.CENTER_VERTICAL);
         top.addView(title, new LinearLayout.LayoutParams(0, dp(48), 1));
-        TextView overflow = label("⋮", 25, TEAL, true);
+        TextView overflow = label("⋯", 25, TEAL, true);
         overflow.setContentDescription("Weitere Navigationseinstellungen");
-        overflow.setOnClickListener(v -> setSheetExpanded(true));
+        overflow.setOnClickListener(v -> setSheetExpanded(!controlsExpanded));
         top.addView(overflow, new LinearLayout.LayoutParams(dp(44), dp(48)));
-        root.addView(top, new LinearLayout.LayoutParams(-1, dp(54)));
+        root.addView(top, new LinearLayout.LayoutParams(-1, dp(48)));
 
         FrameLayout mapFrame = new FrameLayout(this);
         map = new MapView(this);
@@ -230,28 +244,29 @@ public final class NavigateActivity extends Activity
         // Floating guidance card, concise even on small devices.
         LinearLayout guidance = new LinearLayout(this);
         guidance.setGravity(Gravity.CENTER_VERTICAL);
-        guidance.setPadding(dp(13), dp(10), dp(17), dp(10));
-        guidance.setBackground(background(Color.WHITE, 21, 0xFFE6EBEE));
-        guidance.setElevation(dp(5));
-        arrow = label("▲", 32, TEAL, true);
-        guidance.addView(arrow, new LinearLayout.LayoutParams(dp(55), dp(62)));
+        guidance.setPadding(dp(11), dp(8), dp(13), dp(8));
+        guidance.setBackground(background(0xFAFFFFFF, 17, 0xFFE6EBEE));
+        guidance.setElevation(dp(3));
+        arrow = label("▲", 23, TEAL, true);
+        guidance.addView(arrow, new LinearLayout.LayoutParams(dp(40), dp(46)));
         LinearLayout guidanceWords = new LinearLayout(this);
         guidanceWords.setOrientation(LinearLayout.VERTICAL);
-        distanceText = label("Suche Standort …", 27, INK, true);
+        distanceText = label("Standort suchen", 22, INK, true);
         distanceText.setGravity(Gravity.START | Gravity.CENTER_VERTICAL);
         guidanceWords.addView(distanceText);
-        routeDetails = label("Richtung zum Auto", 13, MUTED, false);
+        routeDetails = label("Standort wird ermittelt", 12, MUTED, false);
         routeDetails.setGravity(Gravity.START | Gravity.CENTER_VERTICAL);
         guidanceWords.addView(routeDetails);
-        stepText = label("Luftlinie", 12, MUTED, false);
+        stepText = label("", 12, MUTED, false);
         stepText.setGravity(Gravity.START | Gravity.CENTER_VERTICAL);
-        stepText.setMaxLines(2);
+        stepText.setMaxLines(1);
+        stepText.setEllipsize(TextUtils.TruncateAt.END);
+        stepText.setVisibility(View.GONE);
         guidanceWords.addView(stepText);
         guidance.addView(guidanceWords, new LinearLayout.LayoutParams(0, -2, 1));
         FrameLayout.LayoutParams guideParams = new FrameLayout.LayoutParams(
-                Math.min(dp(306), getResources().getDisplayMetrics().widthPixels - dp(32)),
-                -2, Gravity.TOP | Gravity.LEFT);
-        guideParams.setMargins(dp(14), dp(14), 0, 0);
+                -1, -2, Gravity.TOP);
+        guideParams.setMargins(dp(12), dp(12), dp(12), 0);
         mapFrame.addView(guidance, guideParams);
 
         LinearLayout tools = new LinearLayout(this);
