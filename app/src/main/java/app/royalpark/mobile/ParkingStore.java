@@ -12,7 +12,7 @@ import java.util.List;
 /** Local-only storage: no login, analytics or cloud connection. */
 public final class ParkingStore extends SQLiteOpenHelper {
     private static final String DB_NAME = "royalpark.db";
-    private static final int DB_VERSION = 1;
+    private static final int DB_VERSION = 2;
     private final Context context;
 
     public ParkingStore(Context context) {
@@ -26,12 +26,16 @@ public final class ParkingStore extends SQLiteOpenHelper {
                 + "latitude REAL NOT NULL, longitude REAL NOT NULL,"
                 + "note TEXT NOT NULL DEFAULT '', parked_at INTEGER NOT NULL,"
                 + "source TEXT NOT NULL, timer_at INTEGER NOT NULL DEFAULT 0,"
-                + "photo_uri TEXT NOT NULL DEFAULT '')");
+                + "photo_uri TEXT NOT NULL DEFAULT '',"
+                + "garage_floor TEXT NOT NULL DEFAULT '',"
+                + "garage_spot TEXT NOT NULL DEFAULT '')");
     }
 
     @Override public void onUpgrade(SQLiteDatabase db, int oldVersion, int newVersion) {
-        // Future schema changes will use additive migrations: never drop users' history.
-        throw new IllegalStateException("Migration missing for version " + oldVersion);
+        if (oldVersion < 2 && newVersion >= 2) {
+            db.execSQL("ALTER TABLE parking_spots ADD COLUMN garage_floor TEXT NOT NULL DEFAULT ''");
+            db.execSQL("ALTER TABLE parking_spots ADD COLUMN garage_spot TEXT NOT NULL DEFAULT ''");
+        }
     }
 
     public synchronized ParkingSpot save(double latitude, double longitude, String note, String source) {
@@ -88,6 +92,58 @@ public final class ParkingStore extends SQLiteOpenHelper {
         getWritableDatabase().update("parking_spots", row, "id=?", new String[]{Long.toString(id)});
     }
 
+    public synchronized void setGarage(long id, String floor, String spot) {
+        ContentValues values = new ContentValues();
+        values.put("garage_floor", GarageLabels.clean(floor));
+        values.put("garage_spot", GarageLabels.clean(spot));
+        getWritableDatabase().update("parking_spots", values, "id=?",
+                new String[]{Long.toString(id)});
+    }
+
+    public synchronized boolean contains(double lat, double lon, long parkedAt) {
+        return contains(getReadableDatabase(), lat, lon, parkedAt);
+    }
+
+    private boolean contains(SQLiteDatabase db, double lat, double lon, long parkedAt) {
+        try (Cursor c = db.rawQuery("SELECT 1 FROM parking_spots "
+                        + "WHERE latitude=? AND longitude=? AND parked_at=? LIMIT 1",
+                new String[]{Double.toString(lat), Double.toString(lon), Long.toString(parkedAt)})) {
+            return c.moveToFirst();
+        }
+    }
+
+    /** Merge imported records transactionally, preserving all existing rows and active choice. */
+    public synchronized int mergeBackup(List<ParkingArchive.Record> imported) {
+        SQLiteDatabase db = getWritableDatabase();
+        boolean activeExists = active() != null;
+        long restoredActive = -1;
+        int count = 0;
+        db.beginTransaction();
+        try {
+            for (ParkingArchive.Record record : imported) {
+                if (contains(db, record.latitude, record.longitude, record.parkedAt)) continue;
+                ContentValues row = new ContentValues();
+                row.put("latitude", record.latitude);
+                row.put("longitude", record.longitude);
+                row.put("note", record.note);
+                row.put("source", record.source);
+                row.put("parked_at", record.parkedAt);
+                row.put("timer_at", 0); // Imported timers must be rearmed explicitly.
+                row.put("photo_uri", record.photoUri);
+                row.put("garage_floor", record.floor);
+                row.put("garage_spot", record.space);
+                long id = db.insertOrThrow("parking_spots", null, row);
+                if (record.active && restoredActive < 0) restoredActive = id;
+                count++;
+            }
+            db.setTransactionSuccessful();
+        } finally {
+            db.endTransaction();
+        }
+        if (!activeExists && restoredActive >= 0) setActiveId(restoredActive);
+        return count;
+    }
+
     public synchronized void setPhoto(long id, String uri) {
         ContentValues row = new ContentValues();
         row.put("photo_uri", uri == null ? "" : uri);
@@ -112,6 +168,8 @@ public final class ParkingStore extends SQLiteOpenHelper {
                 c.getLong(c.getColumnIndexOrThrow("parked_at")),
                 c.getString(c.getColumnIndexOrThrow("source")),
                 c.getLong(c.getColumnIndexOrThrow("timer_at")),
-                c.getString(c.getColumnIndexOrThrow("photo_uri")));
+                c.getString(c.getColumnIndexOrThrow("photo_uri")),
+                c.getString(c.getColumnIndexOrThrow("garage_floor")),
+                c.getString(c.getColumnIndexOrThrow("garage_spot")));
     }
 }

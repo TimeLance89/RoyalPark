@@ -13,8 +13,13 @@
 - Geräterealtests der neuen Bewegungs-/Aktivitätserkennung und Kombinationslogik
 - Originalgetreue Einstellungsseiten/Onboarding (Referenzscreenshots erforderlich)
 - Offlinekarten mit regelkonformem Kartenprovider
-- Widget-Größen optimieren, Wear OS, Parkhausmodus
+- Widget-Größen optimieren, Wear OS, erweiterter Parkhausmodus (Grundfunktion 0.6.0)
 - Geräterealtests auf HyperOS/Android 15, Akkuoptimierung, Berechtigungen und Rotation
-- Langfristig: Automatisierte UI-Tests, Datenexport/Import, mehrere Fahrzeuge, Kartenbibliothekswechsel
+- Langfristig: Automatisierte UI-Tests, mehrere Fahrzeuge, Kartenbibliothekswechsel
 
 Kein Fremdquellcode, keine fremden Grafiken, kein Lizenz-/Aboumgehungscode.
+
+## Neu in 0.6.0
+- Ebene/Stellplatz, SQLite-Migration v1→v2, ZIP-Backup und Merge-Restore inklusive zugänglicher Bilder
+- Offen: Geräte-Ende-zu-Ende-Test von Datensicherung und Bildimport
+- Offen: stabile Release-Signierung für Updates ohne Deinstallation

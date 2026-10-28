@@ -10,9 +10,11 @@ public final class ParkingSpot {
     public final String source;
     public final long timerAt;
     public final String photoUri;
+    public final String floor;
+    public final String space;
 
     ParkingSpot(long id, double latitude, double longitude, String note,
-                long parkedAt, String source, long timerAt, String photoUri) {
+                long parkedAt, String source, long timerAt, String photoUri, String floor, String space) {
         this.id = id;
         this.latitude = latitude;
         this.longitude = longitude;
@@ -21,5 +23,7 @@ public final class ParkingSpot {
         this.source = source;
         this.timerAt = timerAt;
         this.photoUri = photoUri;
+        this.floor = floor;
+        this.space = space;
     }
 }

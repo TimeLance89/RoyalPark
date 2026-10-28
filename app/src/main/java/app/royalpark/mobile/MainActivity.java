@@ -50,6 +50,8 @@ import java.util.Date;
 import java.util.List;
 import java.util.Locale;
 import java.util.Set;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
 
 /**
  * Original, clean-room implementation of a car parking helper.
@@ -70,6 +72,8 @@ public final class MainActivity extends Activity {
     private static final int REQ_PHOTO = 103;
     private static final int REQ_CAMERA = 104;
     private static final int REQ_MOTION = 105;
+    private static final int REQ_BACKUP_CREATE = 106;
+    private static final int REQ_BACKUP_IMPORT = 107;
     private static final int TAB_MAP = 0;
     private static final int TAB_HISTORY = 1;
     private static final int TAB_SETTINGS = 2;
@@ -87,6 +91,7 @@ public final class MainActivity extends Activity {
     private Uri pendingCameraUri;
     private String pendingCameraFile;
     private int currentTab = TAB_MAP;
+    private final ExecutorService backupExecutor = Executors.newSingleThreadExecutor();
 
     @Override public void onCreate(Bundle state) {
         super.onCreate(state);
@@ -405,8 +410,10 @@ public final class MainActivity extends Activity {
             TextView close = text("⋯", 28, MUTED, true);
             close.setGravity(Gravity.CENTER);
             close.setOnClickListener(v -> new AlertDialog.Builder(this)
-                    .setItems(new String[]{"Parkplatz neu speichern", "Verlauf öffnen"}, (d, selected) -> {
-                        if (selected == 0) saveCurrent(); else showTab(TAB_HISTORY);
+                    .setItems(new String[]{"Parkplatz neu speichern", "Verlauf öffnen", "Parkhausangaben bearbeiten"}, (d, selected) -> {
+                        if (selected == 0) saveCurrent();
+                        else if (selected == 1) showTab(TAB_HISTORY);
+                        else editGarage(active);
                     }).show());
             headline.addView(close, new LinearLayout.LayoutParams(dp(42), dp(42)));
             sheet.addView(headline);
@@ -414,6 +421,8 @@ public final class MainActivity extends Activity {
                 line(sheet, "Standortgenauigkeit  ±" + Math.round(deviceLocation.getAccuracy()) + " m",
                         12, ACCENT_DARK, false, 9);
             }
+            String garage = GarageLabels.summary(active.floor, active.space);
+            if (!garage.isEmpty()) line(sheet, "Parkhaus: " + garage, 13, ACCENT_DARK, true, 7);
             if (!active.note.isEmpty()) line(sheet, active.note, 13, MUTED, false, 7);
             if (active.timerAt > 0) line(sheet, "Parkuhr bis " + format(active.timerAt),
                     13, ACCENT_DARK, true, 7);
@@ -424,7 +433,7 @@ public final class MainActivity extends Activity {
             threeActions(sheet,
                     quickAction("▣", "Foto", () -> photo(active)),
                     quickAction("↗", "Teilen", () -> share(active)),
-                    quickAction("＋", "Neu parken", this::saveCurrent));
+                    quickAction("▤", "Parkhaus", () -> editGarage(active)));
         }
         FrameLayout.LayoutParams sheetParams = new FrameLayout.LayoutParams(
                 -1, -2, Gravity.BOTTOM | Gravity.CENTER_HORIZONTAL);
@@ -478,8 +487,11 @@ public final class MainActivity extends Activity {
             line(item, format(spot.parkedAt), 17, WHITE, true, 7);
             line(item, String.format(Locale.GERMANY, "%.5f, %.5f", spot.latitude, spot.longitude),
                     13, MUTED, false, 6);
+            String garage = GarageLabels.summary(spot.floor, spot.space);
+            if (!garage.isEmpty()) line(item, "Parkhaus: " + garage, 14, ACCENT_DARK, true, 5);
             if (!spot.note.isEmpty()) line(item, spot.note, 14, WHITE, false, 5);
             actionLine(item, "↗  Navigation", false, () -> navigate(spot));
+            actionLine(item, "▤  Parkhaus: Ebene und Stellplatz", false, () -> editGarage(spot));
             actionLine(item, spot.photoUri.isEmpty() ? "▣  Parkplatzfoto hinzufügen" : "▣  Parkplatzfoto verwalten",
                     false, () -> photo(spot));
             actionLine(item, "↗  Parkplatz teilen", false, () -> share(spot));
@@ -534,6 +546,16 @@ public final class MainActivity extends Activity {
         line(movement, "Du kannst Bluetooth und Bewegung gemeinsam verwenden. Doppelte Erkennungen werden unterdrückt.",
                 12, MUTED, false, 10);
         margin(content, movement, 16);
+        LinearLayout backup = card();
+        line(backup, "DATENSICHERUNG", 12, ACCENT_DARK, true, 0);
+        line(backup, "Parkplätze und Fotos sichern", 18, WHITE, true, 8);
+        line(backup, "Die ZIP-Sicherung speichert Positionen, Notizen, Parkhausangaben und erreichbare Fotos. Du wählst den Speicherort selbst. Die Datei ist nicht verschlüsselt und enthält genaue Standortdaten.",
+                13, MUTED, false, 9);
+        actionLine(backup, "⬇  Sicherung erstellen (.zip)", false, this::exportBackup);
+        actionLine(backup, "⬆  Sicherung wiederherstellen", false, this::importBackup);
+        line(backup, "Beim Import bleiben vorhandene Parkplätze erhalten. Alte Parkuhren werden aus Sicherheitsgründen nicht neu aktiviert.",
+                12, MUTED, false, 8);
+        margin(content, backup, 16);
         LinearLayout privacy = card();
         line(privacy, "DATENSCHUTZ", 12, ACCENT, true, 0);
         line(privacy, "Kein Konto. Kein Tracking. Keine Werbung.", 17, WHITE, true, 7);
@@ -546,7 +568,7 @@ public final class MainActivity extends Activity {
             startActivity(intent);
         });
         margin(content, privacy, 16);
-        line(content, "ROYALPARK 0.4.0  ·  Eigenständiger Neubau", 12, MUTED, false, 25);
+        line(content, "ROYALPARK 0.6.0  ·  Eigenständiger Neubau", 12, MUTED, false, 25);
     }
 
     private void ensureLocation(Runnable action) {
@@ -599,6 +621,110 @@ public final class MainActivity extends Activity {
                     store.setNote(spot.id, input.getText().toString().trim());
                     ParkingWidget.updateAll(this);
                     showTab(currentTab);
+                }).show();
+    }
+
+    private void editGarage(ParkingSpot spot) {
+        LinearLayout layout = column();
+        layout.setPadding(dp(18), dp(8), dp(18), dp(4));
+        TextView floorLabel = text("Ebene / Etage", 14, MUTED, true);
+        layout.addView(floorLabel);
+        EditText floor = new EditText(this);
+        floor.setSingleLine(true);
+        floor.setHint("z. B. -2 oder P3");
+        floor.setText(spot.floor);
+        layout.addView(floor);
+        TextView spaceLabel = text("Stellplatz / Bereich", 14, MUTED, true);
+        layout.addView(spaceLabel);
+        EditText space = new EditText(this);
+        space.setSingleLine(true);
+        space.setHint("z. B. B-17");
+        space.setText(spot.space);
+        layout.addView(space);
+        new AlertDialog.Builder(this)
+                .setTitle("Parkhausangaben")
+                .setView(layout)
+                .setNegativeButton("Abbrechen", null)
+                .setNeutralButton("Leeren", (d, w) -> {
+                    store.setGarage(spot.id, "", "");
+                    showTab(currentTab);
+                })
+                .setPositiveButton("Speichern", (d, w) -> {
+                    store.setGarage(spot.id, floor.getText().toString(), space.getText().toString());
+                    showTab(currentTab);
+                }).show();
+    }
+
+    private void exportBackup() {
+        Intent intent = new Intent(Intent.ACTION_CREATE_DOCUMENT);
+        intent.setType("application/zip");
+        intent.addCategory(Intent.CATEGORY_OPENABLE);
+        intent.putExtra(Intent.EXTRA_TITLE, "RoyalPark-Backup-" + System.currentTimeMillis() + ".zip");
+        try { startActivityForResult(intent, REQ_BACKUP_CREATE); }
+        catch (Exception error) { error("Kein Dokumenten-Manager gefunden."); }
+    }
+
+    private void importBackup() {
+        Intent intent = new Intent(Intent.ACTION_OPEN_DOCUMENT);
+        intent.setType("*/*");
+        intent.addCategory(Intent.CATEGORY_OPENABLE);
+        try { startActivityForResult(intent, REQ_BACKUP_IMPORT); }
+        catch (Exception error) { error("Kein Dokumenten-Manager gefunden."); }
+    }
+
+    private void exportTo(Uri destination) {
+        toast("Sicherung wird erstellt …");
+        backupExecutor.execute(() -> {
+            try (ParkingStore db = new ParkingStore(getApplicationContext())) {
+                ParkingArchive.Result result = ParkingArchive.exportTo(
+                        getApplicationContext(), db, destination);
+                runOnUiThread(() -> {
+                    if (isFinishing() || isDestroyed()) return;
+                    new AlertDialog.Builder(this)
+                            .setTitle("Sicherung erstellt")
+                            .setMessage(result.entries + " Parkplätze und " + result.photos
+                                    + " Fotos gespeichert." + (result.skippedPhotos > 0
+                                    ? "\n" + result.skippedPhotos + " Fotos waren nicht mehr zugänglich und fehlen im Archiv." : "")
+                                    + "\n\nBewahre die ZIP-Datei sicher auf. Sie enthält genaue Standortdaten.")
+                            .setPositiveButton("OK", null).show();
+                });
+            } catch (Exception failure) {
+                runOnUiThread(() -> {
+                    if (!isFinishing() && !isDestroyed())
+                        error("Sicherung fehlgeschlagen: " + failure.getMessage());
+                });
+            }
+        });
+    }
+
+    private void restoreFrom(Uri source) {
+        new AlertDialog.Builder(this)
+                .setTitle("Sicherung wiederherstellen?")
+                .setMessage("Die Daten dieser ZIP-Sicherung werden mit deinen vorhandenen Parkplätzen zusammengeführt. Bereits vorhandene Einträge bleiben erhalten, Duplikate werden übersprungen. Parkuhren müssen anschließend erneut eingestellt werden.")
+                .setNegativeButton("Abbrechen", null)
+                .setPositiveButton("Importieren", (d, w) -> {
+                    toast("Sicherung wird geprüft und importiert …");
+                    backupExecutor.execute(() -> {
+                        try (ParkingStore db = new ParkingStore(getApplicationContext())) {
+                            ParkingArchive.Result result = ParkingArchive.restoreFrom(
+                                    getApplicationContext(), db, source);
+                            runOnUiThread(() -> {
+                                if (isFinishing() || isDestroyed()) return;
+                                ParkingWidget.updateAll(this);
+                                showTab(TAB_HISTORY);
+                                new AlertDialog.Builder(this)
+                                        .setTitle("Import abgeschlossen")
+                                        .setMessage(result.entries + " neue Parkplätze importiert. "
+                                                + result.photos + " Bilder aus der Sicherung gelesen.")
+                                        .setPositiveButton("OK", null).show();
+                            });
+                        } catch (Exception failure) {
+                            runOnUiThread(() -> {
+                                if (!isFinishing() && !isDestroyed())
+                                    error("Import fehlgeschlagen: " + failure.getMessage());
+                            });
+                        }
+                    });
                 }).show();
     }
 
@@ -865,6 +991,16 @@ public final class MainActivity extends Activity {
 
     @Override protected void onActivityResult(int requestCode, int resultCode, Intent data) {
         super.onActivityResult(requestCode, resultCode, data);
+        if (requestCode == REQ_BACKUP_CREATE) {
+            if (resultCode == RESULT_OK && data != null && data.getData() != null)
+                exportTo(data.getData());
+            return;
+        }
+        if (requestCode == REQ_BACKUP_IMPORT) {
+            if (resultCode == RESULT_OK && data != null && data.getData() != null)
+                restoreFrom(data.getData());
+            return;
+        }
         if (requestCode == REQ_PHOTO) {
             if (resultCode == RESULT_OK && data != null
                     && data.getData() != null && photoSpotId > 0) {
@@ -909,6 +1045,7 @@ public final class MainActivity extends Activity {
     }
 
     @Override protected void onDestroy() {
+        backupExecutor.shutdown();
         if (map != null) {
             map.onDetach();
             map = null;

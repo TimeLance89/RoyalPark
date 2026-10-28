@@ -1,4 +1,4 @@
-# RoyalPark – unabhängige Android-Parkplatz-App (v0.5.0)
+# RoyalPark – unabhängige Android-Parkplatz-App (v0.6.0)
 
 RoyalPark ist eine eigenständige Android-App mit eigenem Quellcode. Die Funktionen orientieren sich an der von dir bereitgestellten Parkplatz-App, aber wir verwenden weder deren Programmcode noch geschützte App-Ressourcen.
 
@@ -32,3 +32,16 @@ Java 17 · compileSdk 35 · Android Gradle Plugin · OSMdroid · Google Play Ser
 CI: `.github/workflows/android.yml` führt `:app:testDebugUnitTest` und `:app:assembleDebug` aus und veröffentlicht ein APK-Artefakt.
 
 Version 0.5.0 ist ein schrittweiser Nachbau der Funktionen und keine pixelgenaue oder vollständige Kopie.
+
+
+## 0.6.0: Parkhausdaten und portable ZIP-Sicherung
+Unter **Einstellungen → Datensicherung** können Parkplätze über den Android-Dateidialog in ein ZIP-Archiv exportiert und später wieder importiert werden. Es wird keine Cloud automatisch angesprochen. Das Archiv enthält genaue Koordinaten und ist **nicht verschlüsselt**.
+
+- Export: Koordinaten, Zeitpunkt, Quelle, Notizen, Ebene/Stellplatz und zugängliche Bilder. Nicht mehr zugängliche Bilder werden beim Export gemeldet.
+- Import: Sichere Prüfung der Formate, Pfade und Größen. Bestehende Parkplätze bleiben erhalten; Duplikate anhand Zeitstempel/Koordinaten werden übersprungen.
+- Importierte Parkuhren werden nicht reaktiviert. Fotos werden in den app-spezifischen Bilderordner kopiert.
+- Limits: maximal 5000 Parkplätze, 8 MiB pro Foto, 120 MiB unkomprimierte ZIP-Daten.
+- SQLite-Datenbankmigration v1 → v2 für `garage_floor` und `garage_spot` ohne Verlust bestehender Datensätze.
+- Keine allgemeinen Speicherrechte nötig (Android-Dokumentenauswahl).
+- **Achtung:** Die GitHub-Debug-Signatur ist noch nicht dauerhaft festgelegt. Sichere die Daten vor einer Deinstallation, um Datenverlust zu vermeiden.
+- Geräte-Ende-zu-Ende-Tests für Backups, Bildformate und Android-Migration stehen noch aus.

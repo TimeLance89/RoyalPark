@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.6.0 · 28. Oktober 2026
+- Eigene Felder für Parkhaus-Ebene und Stellplatz, SQLite-Migration v1→v2
+- ZIP-Export/-Import über Android-Dokumentenauswahl samt zugänglichen Parkplatzfotos
+- Import als Zusammenführung mit Duplikatprüfung und Datenbanktransaktion; bestehende Einträge bleiben erhalten
+- Größen- und Datenvalidierung bei Backup und Wiederherstellung
+- Importierte Parkuhren werden nicht automatisch reaktiviert
+
 ## 0.5.0 · 28. Oktober 2026
 - Echte interne Fußweg-Routenberechnung per Valhalla, erst nach ausdrücklicher Einwilligung pro Anfrage
 - Anzeige einer berechneten Route als Linie auf der OSM-Karte mit Streckenlänge, Dauer und deutschsprachigen Anweisungen
