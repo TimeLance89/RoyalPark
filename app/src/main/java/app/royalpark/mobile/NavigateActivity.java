@@ -147,7 +147,9 @@ public final class NavigateActivity extends Activity
     }
     private void updateMode() {
         if (modeText == null) return;
-        modeText.setText("ROUTENMODUS · " + (selectedOffline ? "OFFLINE" : "ONLINE"));
+        modeText.setText("WELCHE ROUTE?");
+        if (recalculateButton != null && !loading)
+            recalculateButton.setText(NavigationDockText.routeAction(selectedOffline, route != null));
         if (offlineModeButton != null)
             offlineModeButton.setBackground(background(selectedOffline ? 0xFFE1F3F3 : 0xFFF5F7F8,
                     15, selectedOffline ? 0xFFB4DEDF : Color.TRANSPARENT));
@@ -163,7 +165,12 @@ public final class NavigateActivity extends Activity
         controlsExpanded = expanded;
         if (secondaryControls != null)
             secondaryControls.setVisibility(expanded ? View.VISIBLE : View.GONE);
-        if (moreButton != null) moreButton.setText(expanded ? "Weniger" : "Mehr");
+        if (moreButton != null) {
+            moreButton.setText(expanded ? "Weniger" : "Mehr");
+            moreButton.setContentDescription(expanded
+                    ? "Zusätzliche Navigationsaktionen schließen"
+                    : "Zusätzliche Navigationsaktionen öffnen");
+        }
     }
 
     @Override public void onCreate(Bundle state) {
@@ -178,12 +185,12 @@ public final class NavigateActivity extends Activity
                 View.SYSTEM_UI_FLAG_LIGHT_STATUS_BAR | View.SYSTEM_UI_FLAG_LIGHT_NAVIGATION_BAR);
         MapPerformance.configure(this, getPreferences(MODE_PRIVATE));
 
-        // Compact app bar + full-height map. Guidance and actions float over the map
-        // instead of allocating two huge fixed panels above/below it.
+        // Map-first navigation: all controls are overlays on the SAME osmdroid MapView.
+        // Map tile provider and overlays remain connected to online maps, Mapsforge,
+        // imported raster maps and BRouter/Valhalla route geometries.
         LinearLayout root = new LinearLayout(this);
         root.setOrientation(LinearLayout.VERTICAL);
         root.setBackgroundColor(BG);
-        // On Android 15, the status/navigation bars are edge-to-edge.
         if (Build.VERSION.SDK_INT >= 35) {
             root.setOnApplyWindowInsetsListener((view, insets) -> {
                 android.graphics.Insets bars = insets.getInsets(WindowInsets.Type.systemBars());
@@ -192,22 +199,6 @@ public final class NavigateActivity extends Activity
             });
         }
         setContentView(root);
-        LinearLayout top = new LinearLayout(this);
-        top.setGravity(Gravity.CENTER_VERTICAL);
-        top.setBackgroundColor(Color.WHITE);
-        top.setPadding(dp(10), 0, dp(10), 0);
-        TextView back = label("‹", 29, TEAL, true);
-        back.setContentDescription("Zurück zur Parkplatzkarte");
-        back.setOnClickListener(v -> finish());
-        top.addView(back, new LinearLayout.LayoutParams(dp(46), dp(48)));
-        TextView title = label("Zum Auto", 18, INK, true);
-        title.setGravity(Gravity.START | Gravity.CENTER_VERTICAL);
-        top.addView(title, new LinearLayout.LayoutParams(0, dp(48), 1));
-        TextView overflow = label("⋯", 25, TEAL, true);
-        overflow.setContentDescription("Weitere Navigationseinstellungen");
-        overflow.setOnClickListener(v -> setSheetExpanded(!controlsExpanded));
-        top.addView(overflow, new LinearLayout.LayoutParams(dp(44), dp(48)));
-        root.addView(top, new LinearLayout.LayoutParams(-1, dp(48)));
 
         FrameLayout mapFrame = new FrameLayout(this);
         map = new MapView(this);
@@ -215,16 +206,17 @@ public final class NavigateActivity extends Activity
                 new String[]{"https://tile.openstreetmap.org/"}));
         OfflineMaps.apply(this, map);
         map.setMultiTouchControls(true);
-        map.getController().setZoom(17.5);
+        map.setFlingEnabled(true);
+        map.getController().setZoom(18);
         map.getController().setCenter(new GeoPoint(targetLat, targetLon));
         Marker carMarker = new Marker(map);
-        carMarker.setTitle("Mein Auto");
+        carMarker.setTitle("Hier steht dein Auto");
         carMarker.setIcon(getDrawable(R.drawable.ic_nav_car));
         carMarker.setPosition(new GeoPoint(targetLat, targetLon));
         carMarker.setAnchor(Marker.ANCHOR_CENTER, Marker.ANCHOR_BOTTOM);
         map.getOverlays().add(carMarker);
         pointerLine = new Polyline(map);
-        pointerLine.setColor(0xFF9DB4BA);
+        pointerLine.setColor(0xAA7199A2);
         pointerLine.setWidth(dp(2));
         map.getOverlays().add(pointerLine);
         routeLine = new Polyline(map);
@@ -232,148 +224,186 @@ public final class NavigateActivity extends Activity
         routeLine.setWidth(dp(5));
         map.getOverlays().add(routeLine);
         myMarker = new Marker(map);
-        myMarker.setTitle("Dein Standort");
+        myMarker.setTitle("Mein aktueller Standort");
         myMarker.setIcon(getDrawable(R.drawable.ic_nav_location_dot));
         myMarker.setAnchor(Marker.ANCHOR_CENTER, Marker.ANCHOR_CENTER);
         map.getOverlays().add(myMarker);
         mapFrame.addView(map, new FrameLayout.LayoutParams(-1, -1));
         root.addView(mapFrame, new LinearLayout.LayoutParams(-1, 0, 1));
 
-        // Floating guidance card, concise even on small devices.
+        // Small floating toolbar. The large old white activity header is gone.
+        LinearLayout toolbar = new LinearLayout(this);
+        toolbar.setGravity(Gravity.CENTER_VERTICAL);
+        toolbar.setPadding(dp(5), dp(2), dp(5), dp(2));
+        toolbar.setBackground(background(0xF7FFFFFF, 20, 0xFFE1E9EC));
+        toolbar.setElevation(dp(4));
+        TextView back = label("‹", 30, TEAL, true);
+        back.setGravity(Gravity.CENTER);
+        back.setContentDescription("Navigation verlassen");
+        back.setOnClickListener(v -> finish());
+        toolbar.addView(back, new LinearLayout.LayoutParams(dp(47), dp(43)));
+        TextView title = label("Zum Parkplatz", 17, INK, true);
+        title.setGravity(Gravity.CENTER_VERTICAL);
+        toolbar.addView(title, new LinearLayout.LayoutParams(0, dp(43), 1));
+        TextView menu = label("⋯", 25, TEAL, true);
+        menu.setGravity(Gravity.CENTER);
+        menu.setContentDescription("Navigationseinstellungen öffnen");
+        menu.setOnClickListener(v -> setSheetExpanded(!controlsExpanded));
+        toolbar.addView(menu, new LinearLayout.LayoutParams(dp(43), dp(43)));
+        FrameLayout.LayoutParams toolbarLp =
+                new FrameLayout.LayoutParams(-1, dp(48), Gravity.TOP);
+        toolbarLp.setMargins(dp(12), dp(9), dp(12), 0);
+        mapFrame.addView(toolbar, toolbarLp);
+
+        // One readable floating direction indicator; no giant white top panel.
         LinearLayout guidance = new LinearLayout(this);
         guidance.setGravity(Gravity.CENTER_VERTICAL);
-        guidance.setPadding(dp(11), dp(8), dp(13), dp(8));
-        guidance.setBackground(background(0xFAFFFFFF, 17, 0xFFE6EBEE));
-        guidance.setElevation(dp(3));
-        arrow = label("▲", 23, TEAL, true);
-        guidance.addView(arrow, new LinearLayout.LayoutParams(dp(40), dp(46)));
+        guidance.setPadding(dp(12), dp(8), dp(14), dp(8));
+        guidance.setBackground(background(0xF9FFFFFF, 19, 0xFFE1E9EC));
+        guidance.setElevation(dp(4));
+        arrow = label("▲", 26, TEAL, true);
+        arrow.setGravity(Gravity.CENTER);
+        guidance.addView(arrow, new LinearLayout.LayoutParams(dp(43), dp(55)));
         LinearLayout guidanceWords = new LinearLayout(this);
         guidanceWords.setOrientation(LinearLayout.VERTICAL);
-        distanceText = label("Standort suchen", 22, INK, true);
-        distanceText.setGravity(Gravity.START | Gravity.CENTER_VERTICAL);
+        distanceText = label("Standort suchen", 23, INK, true);
+        distanceText.setGravity(Gravity.CENTER_VERTICAL);
         guidanceWords.addView(distanceText);
-        routeDetails = label("Standort wird ermittelt", 12, MUTED, false);
-        routeDetails.setGravity(Gravity.START | Gravity.CENTER_VERTICAL);
+        routeDetails = label("Zum gespeicherten Auto", 12, MUTED, false);
+        routeDetails.setGravity(Gravity.CENTER_VERTICAL);
         guidanceWords.addView(routeDetails);
         stepText = label("", 12, MUTED, false);
-        stepText.setGravity(Gravity.START | Gravity.CENTER_VERTICAL);
-        stepText.setMaxLines(1);
+        stepText.setGravity(Gravity.CENTER_VERTICAL);
+        stepText.setSingleLine(true);
         stepText.setEllipsize(TextUtils.TruncateAt.END);
         stepText.setVisibility(View.GONE);
         guidanceWords.addView(stepText);
         guidance.addView(guidanceWords, new LinearLayout.LayoutParams(0, -2, 1));
-        FrameLayout.LayoutParams guideParams = new FrameLayout.LayoutParams(
-                -1, -2, Gravity.TOP);
-        guideParams.setMargins(dp(12), dp(12), dp(12), 0);
-        mapFrame.addView(guidance, guideParams);
+        FrameLayout.LayoutParams guideLp =
+                new FrameLayout.LayoutParams(Math.min(dp(270),
+                        getResources().getDisplayMetrics().widthPixels - dp(28)),
+                        -2, Gravity.TOP | Gravity.LEFT);
+        guideLp.setMargins(dp(12), dp(65), 0, 0);
+        mapFrame.addView(guidance, guideLp);
 
-        // Pinch-zoom is already supported. Only one floating recenter control is needed.
+        // One location recenter action; two-finger gestures zoom the map.
         TextView follow = smallAction("⌖", () -> {
-            if (current == null) toast("Standort wird noch ermittelt.");
+            if (current == null) toast("Dein Standort wird noch ermittelt.");
             else {
-                map.getController().animateTo(
-                        new GeoPoint(current.getLatitude(), current.getLongitude()));
-                if (map.getZoomLevelDouble() < 17) map.getController().setZoom(17.5);
+                map.getController().animateTo(new GeoPoint(
+                        current.getLatitude(), current.getLongitude()));
+                if (map.getZoomLevelDouble() < 17.5)
+                    map.getController().setZoom(18);
             }
         });
         follow.setTextSize(24);
-        follow.setContentDescription("Meinen Standort zentrieren");
-        follow.setElevation(dp(3));
-        follow.setBackground(background(Color.WHITE, 18, 0xFFE5EBEE));
-        FrameLayout.LayoutParams followParams = new FrameLayout.LayoutParams(
-                dp(48), dp(48), Gravity.RIGHT | Gravity.BOTTOM);
-        followParams.rightMargin = dp(13);
-        mapFrame.addView(follow, followParams);
+        follow.setGravity(Gravity.CENTER);
+        follow.setContentDescription("Meinen Standort auf der Karte zentrieren");
+        follow.setElevation(dp(4));
+        follow.setBackground(background(0xF9FFFFFF, 19, 0xFFE1E9EC));
+        FrameLayout.LayoutParams followLp =
+                new FrameLayout.LayoutParams(dp(48), dp(48),
+                        Gravity.RIGHT | Gravity.BOTTOM);
+        followLp.rightMargin = dp(12);
+        mapFrame.addView(follow, followLp);
 
+        // Bottom dock has one row by default, not a stack of permanent panels.
         LinearLayout sheet = new LinearLayout(this);
         sheet.setOrientation(LinearLayout.VERTICAL);
-        sheet.setPadding(dp(12), dp(8), dp(12), dp(10));
-        sheet.setBackground(background(Color.WHITE, 21, 0xFFE8EFF0));
-        sheet.setElevation(dp(7));
+        sheet.setPadding(dp(12), dp(8), dp(12), dp(12));
+        sheet.setBackground(background(0xFCFFFFFF, 23, 0xFFE0E9EA));
+        sheet.setElevation(dp(8));
         View grip = new View(this);
-        grip.setBackground(background(0xFFD7E1E3, 4, Color.TRANSPARENT));
-        LinearLayout.LayoutParams gp = new LinearLayout.LayoutParams(dp(32), dp(4));
-        gp.gravity = Gravity.CENTER_HORIZONTAL;
-        gp.bottomMargin = dp(8);
-        sheet.addView(grip, gp);
-
-        LinearLayout commandRow = new LinearLayout(this);
-        recalculateButton = action("Route berechnen", true);
-        recalculateButton.setContentDescription("Gewählte Fußwegroute berechnen oder aktualisieren");
+        grip.setBackground(background(0xFFD3DEE0, 3, Color.TRANSPARENT));
+        LinearLayout.LayoutParams gripLp = new LinearLayout.LayoutParams(
+                dp(35), dp(4));
+        gripLp.gravity = Gravity.CENTER_HORIZONTAL;
+        gripLp.bottomMargin = dp(9);
+        sheet.addView(grip, gripLp);
+        LinearLayout quickActions = new LinearLayout(this);
+        quickActions.setGravity(Gravity.CENTER_VERTICAL);
+        recalculateButton = action("↻  Route", true);
+        recalculateButton.setContentDescription("Fußweg berechnen oder neu berechnen");
         recalculateButton.setOnClickListener(v -> recalculate());
-        addRowItem(commandRow, recalculateButton, 2.1f, 0);
-        moreButton = action("Mehr", false);
-        moreButton.setOnClickListener(v -> setSheetExpanded(!controlsExpanded));
-        addRowItem(commandRow, moreButton, 0.9f, 8);
-        sheet.addView(commandRow);
+        addRowItem(quickActions, recalculateButton, 1.48f, 0);
+        speechButton = smallAction("Ansagen aus", this::toggleSpeech);
+        speechButton.setContentDescription("Sprachausgabe ein- oder ausschalten");
+        addRowItem(quickActions, speechButton, 1.28f, 7);
+        moreButton = smallAction("Mehr", () -> setSheetExpanded(!controlsExpanded));
+        moreButton.setContentDescription("Weitere Navigationsaktionen anzeigen");
+        addRowItem(quickActions, moreButton, 0.75f, 7);
+        sheet.addView(quickActions);
 
         secondaryControls = new LinearLayout(this);
         secondaryControls.setOrientation(LinearLayout.VERTICAL);
-        modeText = label("ROUTENMODUS", 11, MUTED, true);
-        modeText.setGravity(Gravity.START | Gravity.CENTER_VERTICAL);
-        modeText.setPadding(dp(3), dp(11), 0, dp(5));
+        modeText = label("ROUTE WÄHLEN", 11, MUTED, true);
+        modeText.setPadding(dp(4), dp(13), 0, dp(6));
         secondaryControls.addView(modeText);
         LinearLayout modes = new LinearLayout(this);
         offlineModeButton = smallAction("Offline · BRouter", () -> {
             selectedOffline = true;
             updateMode();
         });
+        offlineModeButton.setContentDescription("Offline-Fußwegrouting auswählen");
         onlineModeButton = smallAction("Online", () -> {
             selectedOffline = false;
             updateMode();
         });
-        addRowItem(modes, offlineModeButton, 1.6f, 0);
-        addRowItem(modes, onlineModeButton, 1f, 8);
+        onlineModeButton.setContentDescription("Online-Fußwegrouting auswählen");
+        addRowItem(modes, offlineModeButton, 1.5f, 0);
+        addRowItem(modes, onlineModeButton, 1f, 7);
         secondaryControls.addView(modes);
         LinearLayout extras = new LinearLayout(this);
-        speechButton = smallAction("Ansagen aus", this::toggleSpeech);
-        addRowItem(extras, speechButton, 1f, 0);
-        TextView external = smallAction("Externe Karte", this::openExternal);
-        addRowItem(extras, external, 1f, 8);
+        TextView external = smallAction("↗  Externe Karte", this::openExternal);
+        addRowItem(extras, external, 1f, 0);
+        TextView end = smallAction("Navigation beenden", this::finish);
+        end.setTextColor(0xFFB44C55);
+        addRowItem(extras, end, 1.12f, 7);
         LinearLayout.LayoutParams exLp = new LinearLayout.LayoutParams(-1, -2);
         exLp.topMargin = dp(8);
         secondaryControls.addView(extras, exLp);
-        TextView end = smallAction("Navigation beenden", this::finish);
-        end.setTextColor(0xFFB54A56);
-        LinearLayout.LayoutParams endLp = new LinearLayout.LayoutParams(-1, dp(44));
-        endLp.topMargin = dp(8);
-        secondaryControls.addView(end, endLp);
-        sheet.addView(secondaryControls);
-        FrameLayout.LayoutParams bottomParams = new FrameLayout.LayoutParams(
+        LinearLayout.LayoutParams moreLp = new LinearLayout.LayoutParams(-1, -2);
+        sheet.addView(secondaryControls, moreLp);
+        FrameLayout.LayoutParams sheetLp = new FrameLayout.LayoutParams(
                 -1, -2, Gravity.BOTTOM);
-        mapFrame.addView(sheet, bottomParams);
+        sheetLp.setMargins(dp(10), 0, dp(10), dp(10));
+        mapFrame.addView(sheet, sheetLp);
         selectedOffline = OfflineWalkingRouter.isInstalled(this);
         updateMode();
         setSheetExpanded(false);
 
-        // Attribution always stays in the map and OUTSIDE the bottom sheet.
+        // Never put mandatory OSM attribution underneath an overlay.
         TextView credit = label("© OpenStreetMap-Mitwirkende", 10, MUTED, false);
         credit.setPadding(dp(7), dp(3), dp(7), dp(3));
-        credit.setBackground(background(0xD9FFFFFF, 7, Color.TRANSPARENT));
+        credit.setBackground(background(0xE7FFFFFF, 8, Color.TRANSPARENT));
         credit.setContentDescription("OpenStreetMap-Lizenz öffnen");
         credit.setOnClickListener(v -> startActivity(new Intent(Intent.ACTION_VIEW,
                 Uri.parse("https://www.openstreetmap.org/copyright"))));
-        FrameLayout.LayoutParams credits = new FrameLayout.LayoutParams(
-                -2, -2, Gravity.LEFT | Gravity.BOTTOM);
-        credits.leftMargin = dp(8);
-        mapFrame.addView(credit, credits);
-        Runnable reposition = () -> {
-            FrameLayout.LayoutParams creditParams = (FrameLayout.LayoutParams) credit.getLayoutParams();
-            creditParams.bottomMargin = sheet.getHeight() + dp(8);
-            credit.setLayoutParams(creditParams);
-             FrameLayout.LayoutParams fp = (FrameLayout.LayoutParams) follow.getLayoutParams();
-            fp.bottomMargin = sheet.getHeight() + dp(15);
-            follow.setLayoutParams(fp);
-        };
-        sheet.addOnLayoutChangeListener((v, l, t, r, b, oldL, oldT, oldR, oldB) -> {
-            if (b - t != oldB - oldT) reposition.run();
-        });
-        mapFrame.post(reposition);
+        FrameLayout.LayoutParams creditLp =
+                new FrameLayout.LayoutParams(-2, -2, Gravity.LEFT | Gravity.BOTTOM);
+        creditLp.leftMargin = dp(10);
+        mapFrame.addView(credit, creditLp);
 
-        // Referenced by existing routing callbacks. Visible selection controls
-        // remain separate from transient loading status.
+        Runnable positionOverlays = () -> {
+            int dockHeight = sheet.getHeight();
+            if (dockHeight == 0) return;
+            FrameLayout.LayoutParams p =
+                    (FrameLayout.LayoutParams) follow.getLayoutParams();
+            p.bottomMargin = dockHeight + dp(24);
+            follow.setLayoutParams(p);
+            FrameLayout.LayoutParams c =
+                    (FrameLayout.LayoutParams) credit.getLayoutParams();
+            c.bottomMargin = dockHeight + dp(21);
+            credit.setLayoutParams(c);
+        };
+        sheet.addOnLayoutChangeListener((v, l, t, r, b, ol, ot, or, ob) -> {
+            if ((b - t) != (ob - ot)) positionOverlays.run();
+        });
+        mapFrame.post(positionOverlays);
+
         offlineRouteButton = offlineModeButton;
         routeButton = onlineModeButton;
+
 
         locations = getSystemService(LocationManager.class);
         sensors = getSystemService(SensorManager.class);
@@ -436,7 +466,7 @@ public final class NavigateActivity extends Activity
                 current.getLongitude(), targetLat, targetLon, (result, error) -> {
                     if (isFinishing() || isDestroyed()) return;
                     loading = false;
-                    recalculateButton.setText("Route berechnen");
+                    recalculateButton.setText("↻  Route");
                     if (result != null) displayRoute(result, true);
                     else {
                         stepText.setText("Keine Offline-Route – Kompass funktioniert weiterhin.");
@@ -445,7 +475,7 @@ public final class NavigateActivity extends Activity
                 });
         if (!started) {
             loading = false;
-            recalculateButton.setText("Route berechnen");
+            recalculateButton.setText("↻  Route");
         }
     }
 
@@ -470,7 +500,7 @@ public final class NavigateActivity extends Activity
             runOnUiThread(() -> {
                 if (isFinishing() || isDestroyed()) return;
                 loading = false;
-                    recalculateButton.setText("Route berechnen");
+                    recalculateButton.setText("↻  Route");
                 if (result == null) {
                     stepText.setText("Online-Routing nicht verfügbar – Kompass bleibt aktiv.");
                     routeDetails.setText(failure == null ? "Verbindung fehlgeschlagen" : failure);
@@ -483,7 +513,7 @@ public final class NavigateActivity extends Activity
 
     private void displayRoute(WalkingRouteService.Route result, boolean offline) {
         route = result;
-        recalculateButton.setText("Route aktualisieren");
+        recalculateButton.setText(NavigationDockText.routeAction(offline, true));
         offlineRouteActive = offline;
         selectedOffline = offline;
         updateMode();

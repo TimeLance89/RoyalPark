@@ -61,3 +61,13 @@ Texte: unter 60 Sekunden verbleibender Dauer wird `< 1 Min · zu Fuß` dargestel
 
 ## Navigations-UX 1.4.1
 Die Navigation behandelt ein ungenaues GPS-Signal nicht mehr als sichere Ankunft: Befindet sich die gespeicherte Parkposition innerhalb des Unsicherheitskreises, zeigt sie „Zielbereich“ statt einer irreführend genauen Meterzahl. Selbst ein sehr kurzer Abstand gilt nur als möglicher Zielbereich, sofern das ursprüngliche Auto nur ungefähr gespeichert wurde. Die Kopfzeile berücksichtigt auf Android 15 die Systemleisten. Karte und Orientierung sind die Hauptansicht; ein kleines Bedienfeld bietet Route berechnen und weitere Optionen. Über „Mehr“ stehen Online/Offline-Umschaltung, Ansagen, externe Karte und Beenden bereit. Pinch-Gesten übernehmen den Zoom statt permanenter +/- Schaltflächen.
+
+
+## 1.5.0 – Navigationsoberfläche
+Der Fußwegbildschirm ist nun eine Map-First-Ansicht. Die **bestehende osmdroid-Karte** wird bildschirmfüllend dargestellt; Raster-Offlinekarten sowie Mapsforge-Vektordaten werden weiterhin durch `OfflineMaps.apply(this, map)` zugeschaltet. Die BRouter-/Online-Routen geometrie wird als Polyline auf derselben Karte gezeichnet.
+
+Eine kleine schwebende obere Leiste und ein kompakter dynamischer Zielhinweis ersetzen die hohen permanenten Panels. Die untere Leiste zeigt anfangs Route (mit sichtbar gewähltem Modus), Ansagen und Mehr; Offline/Online-Umschalter, externe Navigation und Beenden sind über Mehr erreichbar. Bei Online-Routing bleibt die ausdrückliche Zustimmung zur Standortübertragung erforderlich. BRouter erfordert weiterhin separat geladene .rd5-Segmente.
+
+Die OpenStreetMap-Attribution bleibt sichtbar, anklickbar und wird oberhalb der veränderlichen Bedienfeldhöhe positioniert. Android 15/Systemleisten werden berücksichtigt.
+
+**Testgrenze:** Das Build ist kein Ersatz für einen Bildschirmtest auf unterschiedlichen Xiaomi/HyperOS-Displays. Besonders große Schrift, Rotation, expandierte Bedienflächen und die Erreichbarkeit der Karten-Gesten sind real zu prüfen.

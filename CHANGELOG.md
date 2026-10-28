@@ -1,5 +1,18 @@
 # Changelog
 
+## 1.5.0 · 28. Oktober 2026
+- Navigation als Map-First-Ansicht neu angeordnet: osmdroid/Mapsforge-Karte nutzt praktisch die gesamte Höhe; Titel, Kompasshinweise und Aktionen schweben platzsparend darüber.
+- Kompakte schwebende obere Navigationsleiste mit Zurück und Menü.
+- Zielhinweis reduziert auf eine kleine dynamische Karte mit Entfernung, Präzisionsstatus und ggf. nächster Anweisung, statt permanentem großen Textbereich.
+- Unteres Bedienfeld im Ausgangszustand kompakt: Route, Ansagen, Mehr. Unter Mehr: bewusste Offline-/Online-Wahl, externe Karte und Navigation beenden.
+- Routing-Schaltfläche bezeichnet immer den tatsächlich ausgewählten Modus.
+- Parkautosymbol, blauer Standortpunkt, Routenlinie und GPS-Unsicherheitslogik bleiben erhalten.
+- OSM-Lizenzangabe sitzt dynamisch oberhalb des Bedienfelds. Ein einziger Zentrierknopf statt großer Zoomtasten.
+- MapView, bereits importierte Rasterkarten, Mapsforge-Regionen und externe BRouter-/Valhalla-Routenanbieter bleiben integriert.
+- Android 15 Systemleisten-Inset-Korrektur aus 1.4.1 übernommen.
+- Android-UI noch nicht auf Xiaomi instrumentiert; CI prüft Kompilierung und Unit-Tests, nicht optische Pixelgenauigkeit.
+- Kein neues Datenbankschema. VersionCode 19.
+
 ## 1.4.1 · 28. Oktober 2026
 - Android-15-Systemleisten berücksichtigt: Navigationskopf überschneidet nicht mehr Uhr oder Statussymbole.
 - Navigations-Zielkarte kleiner und ruhiger; bei einfacher Luftliniennavigation nur eine kompakte Unterzeile.
