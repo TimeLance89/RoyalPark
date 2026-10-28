@@ -1,41 +1,34 @@
-# RoyalPark – unabhängige Android-Parkplatz-App (v0.4.0)
+# RoyalPark – unabhängige Android-Parkplatz-App (v0.5.0)
 
-Eigenständige, deutschsprachige Neuentwicklung anhand der Funktionsanalyse von „Mein Auto finden“ 1.1.15. Fremde APK-Ressourcen oder dekompilierter Programmcode wurden nicht übernommen.
+RoyalPark ist eine eigenständige Android-App mit eigenem Quellcode. Die Funktionen orientieren sich an der von dir bereitgestellten Parkplatz-App, aber wir verwenden weder deren Programmcode noch geschützte App-Ressourcen.
 
-## Funktionsstand
-- GPS-Parkplatzspeicherung mit Genauigkeitsanzeige, aktiver Parkplatz und lokalem Verlauf
-- **Manueller Karten-Pin:** lange auf die OSM-Karte drücken und Position bestätigen
-- **In-App-Kompassnavigation** mit Live-Standort, Luftlinienentfernung, Richtungspfeil und Kartenanzeige
-- Für tatsächliche Fußweg-Routenführung: Schaltfläche zur externen Navigations-App
-- Parkplatznotiz, Foto **aufnehmen oder auswählen**, Parkplatz-Link teilen
-- Parktimer mit Presets **und eigener Dauer** (1–1440 Minuten), Benachrichtigung
-- Opt-in Bluetooth-Parkerkennung bei Trennung eines ausgewählten gekoppelten Geräts
-- **Startbildschirm-Widget** mit aktuellem Parkplatz und Schnell-Speichern
-- Eigene lokale SQLite-Datenbank, keine Cloud-Konten, Werbung oder Analytics
-- CI mit Gradle-Tests, Debug-APK und JUnit-Domain-Tests
+## Funktionen
+- Parkplatz per GPS speichern, auf der Karte markieren, lokale Historie, Notizen und Fotos.
+- Parkuhr mit Benachrichtigung sowie drei Startbildschirm-Widgets.
+- Automatische Parkerkennung per gekoppeltem Auto-Bluetooth und optionaler Android-Bewegungserkennung (nur während eingeschalteter Überwachung).
+- In-App-Navigation mit Live-GPS, Richtungspfeil und Luftlinie.
+- **Neu in 0.5.0:** Echte Fußwegrouten über Valhalla (FOSSGIS-Demoserver), türkisfarbene Route auf der Karte, Distanz-/Zeitübersicht und deutschsprachige Abbiegehinweise.
+- **Optional:** deutsche Sprachausgabe über Android Text-to-Speech, standardmäßig aus.
+- Externer Karten-Button als Alternative.
 
-## Technische Grenzen
-- Die interne Richtung ist **Luftlinie, keine berechnete Straßenroute**. Karten-App für vollständige Abbiegeanweisungen öffnen.
-- Kein Bewegungsmodus der automatischen Parkerkennung, keine Wear-OS-Anbindung, keine vollumfänglichen Offlinekartenpakete.
-- Die sichtbaren OSM-Kartenkacheln werden nach Bedarf geladen. Keine unzulässigen Offline-Prefetch-Abfragen.
-- Android/Xiaomi kann Bluetooth-Hintergrundbetrieb und Timer verzögern. Der Timer verwendet bewusst einen ungenauen Alarm.
-- Die erste Installation und die Funktionen müssen noch auf einem echten Gerät geprüft werden.
-- Ein visuell pixelgenauer Nachbau der Original-App ist ohne Referenzscreenshots aus Version 1.1.15 nicht bestätigt.
+## Datenschutz und Einschränkungen beim Online-Routing
+1. Die App sendet **erst nach Klick und ausdrücklicher Bestätigung** die aktuelle Position und die Zielkoordinaten an `https://valhalla1.openstreetmap.de/route`.
+2. Valhalla ist ein öffentliches Demoangebot mit fair-use Limits und ohne Verfügbarkeitsgarantie. Die App wartet zwischen manuellen Anfragen mindestens 30 Sekunden. Keine automatischen Hintergrundabfragen.
+3. Ohne Verbindung oder bei Servicefehler bleibt die lokale Luftlinien-/Kompassanzeige verfügbar.
+4. Die Fußwegroute ist auf maximal 20 km Luftlinie begrenzt. Abweichungen werden angezeigt; bei Bedarf bewusst neu berechnen.
+5. Der Dienst kann Positionen protokollieren; im RoyalPark-Projekt gibt es keine eigenen Server, Konten oder Tracking-Analysen.
+6. Kartenkacheln stammen von OpenStreetMap. Kein Massen-Download oder vorgefertigtes Offlinepaket.
+7. Die Demo-API muss für eine öffentliche/verbreitete App durch ein eigenes Hosting oder einen vertraglichen Anbieter ersetzt werden. FOSSGIS bittet Entwickler veröffentlichter Apps um Kontaktaufnahme und `X-Client-Id`-Kennzeichnung.
 
-## APK bauen
-Push nach main oder feature/* startet GitHub Actions. Artefakt \`RoyalPark-v0.1-debug\` enthält derzeit die Debug-APK; GitHub Actions müssen erfolgreich sein. Eine vorhandene Debug-APK kann mit derselben Signatur als Update installiert werden; wechselt der Signaturschlüssel, muss vorher gesichert und neu installiert werden.
+## Entwicklungsstatus und offene Punkte
+- Unit-Tests und CI-Build werden über GitHub Actions ausgeführt; echte HyperOS-/Android-Gerätetests stehen aus.
+- Die TTS-Ansagen orientieren sich an der nächsten Routenanweisung, ersetzen aber keine vollwertige Automotive-Navigation.
+- Noch offen: vollständiger Offline-Routingmodus, Wear OS, erweiterte Parkhausunterstützung, visuelle Feinabstimmung und zuverlässige Release-Signatur.
+- Android Debug-APKs von GitHub Actions werden möglicherweise mit unterschiedlichen Debug-Zertifikaten signiert. Vor einer Deinstallation Daten sichern; sonst können Parkeinträge verloren gehen.
 
-## Projekt
-\`MainActivity\`: Karte, Verlauf, Einstellungen; \`NavigateActivity\`: integrierte Live-Richtungsanzeige; \`ParkingStore\`: lokale SQLite-Daten; \`AutoParkService\`: Bluetooth-Überwachung; \`ParkingWidget\`: Widget; \`NavigationMath\`: reine Mathematik mit Tests.
+## Quellcode/Build
+Java 17 · compileSdk 35 · Android Gradle Plugin · OSMdroid · Google Play Services Activity Recognition.
 
-Android Studio: JDK 17, Gradle 8.11.1, compileSdk 35, targetSdk 35. Der Gradle-Wrapper ist noch nicht enthalten.
+CI: `.github/workflows/android.yml` führt `:app:testDebugUnitTest` und `:app:assembleDebug` aus und veröffentlicht ein APK-Artefakt.
 
-## UI 0.3.0
-Die Oberfläche folgt nun der originalen hellen, kartenbasierten Navigation aus den offiziellen Store-Bildern: Fullscreen-OSM-Karte, schwebende Schaltflächen und weißes Parkplatz-Bottom-Sheet. Noch nicht pixelgenau auf einem realen Testgerät verifiziert.
-
-
-## Funktionsausbau 0.4.0
-- **Fahrzeug verlassen:** Bewegungserkennung über Google Play Services Activity Recognition mit gesonderter Berechtigung, kombinierbar mit Bluetooth. Beide Quellen speichern nur bei laufendem Vordergrunddienst. Android kann die Erkennung einschränken; sie ist nicht garantiert.
-- **Drei Widgets:** aktueller Parkplatz, ein Tap zum Öffnen der GPS-Speicherung und Parkuhrstatus. Schnell-Speichern öffnet die App, fragt nötige Berechtigungen ab und speichert danach.
-- **Fotoverwaltung:** vorhandenes Parkplatzfoto ansehen, ersetzen oder die Verknüpfung entfernen.
-- Die neue Funktion benötigt Google Play-Dienste und `ACTIVITY_RECOGNITION`. Keine serverseitige Datensammlung.
+Version 0.5.0 ist ein schrittweiser Nachbau der Funktionen und keine pixelgenaue oder vollständige Kopie.

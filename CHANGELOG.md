@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.5.0 · 28. Oktober 2026
+- Echte interne Fußweg-Routenberechnung per Valhalla, erst nach ausdrücklicher Einwilligung pro Anfrage
+- Anzeige einer berechneten Route als Linie auf der OSM-Karte mit Streckenlänge, Dauer und deutschsprachigen Anweisungen
+- Freiwillige deutsche Text-to-Speech-Ansagen, standardmäßig deaktiviert
+- Keine automatischen Routinganfragen; 30-Sekunden-Abstand, Netzwerktimeouts und Antwortgrößenlimit
+- Offline-/Serverfehler-Fallback auf vorhandene Luftliniennavigation
+- Polyline6-Geometrie-Decoder mit JUnit-Tests
+
 ## 0.4.0 · 28. Oktober 2026
 - Original-Funktionsparität erweitert: optionale Bewegungserkennung beim Aussteigen (Activity Recognition Transition API)
 - Bluetooth- und Bewegungserkennung teilen einen deduplizierten Speicherungspfad und die lokale Parkplatzhistorie

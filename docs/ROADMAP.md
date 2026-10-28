@@ -9,7 +9,7 @@
 - Lokale Datenbank und automatischer GitHub-APK-Build
 
 ## Noch nicht originalgleich / nächster Ausbau
-- Echte interne Fußwegrouten-Berechnung und Sprachausgabe
+- Internes Offline-Routing und detailliertere Sprachnavigation (Online-Fußwegrouten und einfache Ansagen in 0.5.0)
 - Geräterealtests der neuen Bewegungs-/Aktivitätserkennung und Kombinationslogik
 - Originalgetreue Einstellungsseiten/Onboarding (Referenzscreenshots erforderlich)
 - Offlinekarten mit regelkonformem Kartenprovider
