@@ -1,4 +1,4 @@
-# RoyalPark · v0.9.0
+# RoyalPark · v1.0.0
 
 Eigenständige Android-Parkplatz-App. Hauptfunktionen: Parkplatz speichern, lokale Historie, Parkhausangaben, Fotos, ZIP-Backup, Parkuhr, Bluetooth-/Bewegungserkennung und Online-/Offline-Karten.
 
@@ -37,3 +37,10 @@ Java 17, Gradle, Android SDK 35, osmdroid und osmdroid-mapsforge 6.1.20, Google 
 - Die Funktion arbeitet bei installierten Offlinekarten genauso wie online. Die reine Kartenfokussierung fordert keine Routingabfrage an.
 - Es wurde keine Datenbankmigration benötigt; bestehende Parkplätze bleiben unverändert.
 - UI- und GPS-Gerätetests stehen weiterhin aus; GitHub-CI bestätigt nur Kompilierung und Unit-Tests.
+
+## Version 1.0.0 – unterschriebene Distribution
+- Neue Release-Pipeline unter `.github/workflows/release.yml` ohne Debug-Eigenschaften.
+- Dauerhafter Release-Key, Signaturschemata APK v1/v2/v3, Signaturprüfung.
+- Vier geschützte Actions-Secrets statt Schlüsseldaten im öffentlichen Repository.
+- Alte Debug-Versionen können **nicht** über die neue Release-Version aktualisiert werden (Backup/Neuinstallation nötig).
+- Anleitung: [`docs/RELEASE_SIGNING.md`](docs/RELEASE_SIGNING.md).

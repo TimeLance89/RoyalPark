@@ -1,5 +1,12 @@
 # Changelog
 
+## 1.0.0 · 28. Oktober 2026
+- Erste reguläre Release-Linie mit eigenem dauerhaften Android-Signaturschlüssel
+- Sicherer GitHub-Actions-Workflow für signierte APKs, inkl. Signaturprüfung
+- Geheimnisse werden nicht ins öffentliche Repository geschrieben
+- Tag-Releases erfordern zwingend bereitgestellte Signing-Secrets
+- Änderung des Update-Zertifikats gegenüber den bisherigen Debug-APKs (Daten vorher exportieren)
+
 ## 0.9.0 · 28. Oktober 2026
 - Smart Map: Startzoom 19 am aktuellen Parkplatz, eigene Aktionen für Ich/Auto/Beide
 - Zoom der eigenen Position an GPS-Genauigkeit angepasst

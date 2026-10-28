@@ -1,0 +1,91 @@
+name: RoyalPark Release APK
+on:
+  push:
+    branches: [main]
+    tags: ['v*']
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Java 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - name: Android SDK 35
+        run: |
+          set -euo pipefail
+          SDKMANAGER="$(find "$ANDROID_HOME/cmdline-tools" -type f -path '*/bin/sdkmanager' | sort -V | tail -1)"
+          test -n "$SDKMANAGER"
+          yes | "$SDKMANAGER" --licenses >/dev/null || true
+          "$SDKMANAGER" --install 'platforms;android-35' 'build-tools;35.0.0'
+      - name: Gradle 8.11.1
+        uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '8.11.1'
+      - name: Verify tests
+        run: gradle --no-daemon :app:testReleaseUnitTest
+      - name: Build unsigned release
+        run: gradle --no-daemon :app:assembleRelease
+      - name: Check release APK exists
+        run: test -s app/build/outputs/apk/release/app-release-unsigned.apk
+      - name: Sign with private GitHub secrets
+        env:
+          RP_KEYSTORE_BASE64: ${{ secrets.ROYALPARK_KEYSTORE_BASE64 }}
+          RP_STOREPASS: ${{ secrets.ROYALPARK_KEYSTORE_PASSWORD }}
+          RP_KEYALIAS: ${{ secrets.ROYALPARK_KEY_ALIAS }}
+          RP_KEYPASS: ${{ secrets.ROYALPARK_KEY_PASSWORD }}
+        run: |
+          set -euo pipefail
+          if [[ -z "${RP_KEYSTORE_BASE64}" || -z "${RP_STOREPASS}" || -z "${RP_KEYALIAS}" || -z "${RP_KEYPASS}" ]]; then
+            if [[ "$GITHUB_REF" == refs/tags/v* ]]; then
+              echo "::error::Release signing secrets are required for tagged releases."
+              exit 1
+            fi
+            echo "Signing secrets not configured; releasing an UNSIGNED build artifact for local signing."
+            exit 0
+          fi
+          KEYSTORE="$RUNNER_TEMP/royalpark-release.jks"
+          trap 'rm -f "$KEYSTORE"' EXIT
+          printf '%s' "$RP_KEYSTORE_BASE64" | base64 --decode > "$KEYSTORE"
+          "$ANDROID_HOME/build-tools/35.0.0/apksigner" sign \
+            --ks "$KEYSTORE" \
+            --ks-key-alias "$RP_KEYALIAS" \
+            --ks-pass env:RP_STOREPASS \
+            --key-pass env:RP_KEYPASS \
+            --v1-signing-enabled true \
+            --v2-signing-enabled true \
+            --v3-signing-enabled true \
+            --out app/build/outputs/apk/release/RoyalPark-release-signed.apk \
+            app/build/outputs/apk/release/app-release-unsigned.apk
+          "$ANDROID_HOME/build-tools/35.0.0/apksigner" verify --verbose \
+            app/build/outputs/apk/release/RoyalPark-release-signed.apk
+      - name: Upload signed release
+        if: ${{ hashFiles('app/build/outputs/apk/release/RoyalPark-release-signed.apk') != '' }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: RoyalPark-signed-release
+          path: app/build/outputs/apk/release/RoyalPark-release-signed.apk
+          if-no-files-found: error
+      - name: Upload unsigned release for offline signing
+        if: ${{ hashFiles('app/build/outputs/apk/release/RoyalPark-release-signed.apk') == '' }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: RoyalPark-UNSIGNED-release
+          path: app/build/outputs/apk/release/app-release-unsigned.apk
+          if-no-files-found: error
+      - name: Provide local signing utility
+        if: ${{ hashFiles('app/build/outputs/apk/release/RoyalPark-release-signed.apk') == '' }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: Android-apksigner-tool
+          path: ${{ env.ANDROID_HOME }}/build-tools/35.0.0/lib/apksigner.jar
+          if-no-files-found: error
