@@ -91,6 +91,7 @@ public final class MainActivity extends Activity {
     private ImageButton locationButton;
     private Marker myLocationMarker;
     private boolean locatingNow;
+    private boolean regionDownloadRunning;
     private Location deviceLocation;
     private Runnable afterPermission;
     private long photoSpotId = -1;
@@ -389,20 +390,22 @@ public final class MainActivity extends Activity {
             new AlertDialog.Builder(this)
                     .setTitle("Kartenansicht")
                     .setItems(new String[]{"Onlinekarte (Standard)",
-                                    "Offlinekarte verwenden",
-                                    "Offline-Kartenpaket importieren",
+                                    "Kartenregion herunterladen",
+                                    "Geladene Region offline verwenden",
+                                    "Offline-Rasterkarte importieren",
                                     "Karteneinstellungen öffnen"}, (d, which) -> {
                         if (which == 0) {
+                            RegionMaps.disable(this);
                             OfflineMaps.setEnabled(this, false);
                             showTab(TAB_MAP);
-                        } else if (which == 1) {
-                            if (!OfflineMaps.hasArchive(this)) {
-                                error("Bitte zuerst ein Offline-Kartenpaket importieren.");
-                            } else {
-                                OfflineMaps.setEnabled(this, true);
+                        } else if (which == 1) chooseRegion();
+                        else if (which == 2) {
+                            RegionMaps.Region region = RegionMaps.current(this);
+                            if (RegionMaps.downloaded(this, region)) {
+                                RegionMaps.enable(this, region);
                                 showTab(TAB_MAP);
-                            }
-                        } else if (which == 2) importOfflineMap();
+                            } else error("Bitte zuerst eine Region herunterladen.");
+                        } else if (which == 3) importOfflineMap();
                         else showTab(TAB_SETTINGS);
                     }).show();
         });
@@ -605,6 +608,35 @@ public final class MainActivity extends Activity {
         margin(content, backup, 16);
         LinearLayout offlineCard = card();
         line(offlineCard, "OFFLINE-KARTEN", 12, ACCENT_DARK, true, 0);
+        line(offlineCard, "Region direkt herunterladen", 18, WHITE, true, 7);
+        line(offlineCard, "Vektorkarten aus lizenzierter OpenStreetMap-Kartendatenquelle. Bremen/Bremerhaven, Niedersachsen und weitere Bundesländer direkt installieren.",
+                13, MUTED, false, 8);
+        RegionMaps.Region currentRegion = RegionMaps.current(this);
+        line(offlineCard, currentRegion != null && RegionMaps.downloaded(this, currentRegion)
+                ? "Installiert: " + currentRegion.label
+                : "Noch keine Vektorkartenregion gewählt.", 13, MUTED, false, 7);
+        actionLine(offlineCard, "↓  Deutschland-Region auswählen", true, this::chooseRegion);
+        if (currentRegion != null && RegionMaps.downloaded(this, currentRegion)) {
+            actionLine(offlineCard, RegionMaps.enabled(this)
+                    ? "✓  Regionskarte ist offline aktiviert"
+                    : "○  Regionskarte offline aktivieren", false, () -> {
+                RegionMaps.enable(this, currentRegion);
+                OfflineMaps.setEnabled(this, false);
+                showTab(TAB_SETTINGS);
+            });
+            actionLine(offlineCard, "Regionskarte löschen", false, () ->
+                    new AlertDialog.Builder(this)
+                            .setTitle("Regionskarte löschen?")
+                            .setMessage("Die Karte wird entfernt, Parkplätze bleiben erhalten.")
+                            .setNegativeButton("Abbrechen", null)
+                            .setPositiveButton("Löschen", (dialog, which) -> {
+                                RegionMaps.delete(this, currentRegion);
+                                showTab(TAB_SETTINGS);
+                            }).show());
+        }
+        line(offlineCard, "Kartenquelle: Mapsforge / OpenStreetMap-Mitwirkende (ODbL). Routingdaten sind getrennt.",
+                12, MUTED, false, 10);
+        line(offlineCard, "EXISTIERENDE RASTERKARTEN", 12, ACCENT_DARK, true, 14);
         line(offlineCard, "Karte ohne Internet anzeigen", 18, WHITE, true, 7);
         line(offlineCard, "Installiere ein lizenziertes Rasterkarten-Archiv (.mbtiles, .sqlite, .zip). RoyalPark lädt keine Kartengebiete vom öffentlichen OSM-Server herunter.",
                 13, MUTED, false, 8);
@@ -631,8 +663,10 @@ public final class MainActivity extends Activity {
                             OfflineMaps.remove(this);
                             showTab(TAB_SETTINGS);
                         }).show());
-        line(offlineCard, "Offlinekarte = nur Kartendarstellung. Für die berechnete Fußwegroute ist weiterhin Internet notwendig.",
+        line(offlineCard, "Eine Mapsforge-Karte funktioniert ohne Netz. Für Offline-Fußwegrouten benötigt RoyalPark zusätzlich BRouter mit heruntergeladenen .rd5-Segmenten.",
                 12, MUTED, false, 10);
+        actionLine(offlineCard, "Offline-Fußwegrouting (BRouter) einrichten", false,
+                this::setupBRouter);
         margin(content, offlineCard, 16);
         LinearLayout privacy = card();
         line(privacy, "DATENSCHUTZ", 12, ACCENT, true, 0);
@@ -646,7 +680,7 @@ public final class MainActivity extends Activity {
             startActivity(intent);
         });
         margin(content, privacy, 16);
-        line(content, "ROYALPARK 0.7.0  ·  Eigenständiger Neubau", 12, MUTED, false, 25);
+        line(content, "ROYALPARK 0.8.0  ·  Eigenständiger Neubau", 12, MUTED, false, 25);
     }
 
     private void ensureLocation(Runnable action) {
@@ -730,6 +764,95 @@ public final class MainActivity extends Activity {
         if (locationStatus == null) return;
         locationStatus.setText(message);
         locationStatus.setVisibility(View.VISIBLE);
+    }
+
+    private void chooseRegion() {
+        RegionMaps.Region[] regions = RegionMaps.AVAILABLE;
+        String[] labels = new String[regions.length];
+        for (int i=0; i<regions.length; i++) {
+            labels[i] = regions[i].display() + (RegionMaps.downloaded(this, regions[i]) ? " · installiert" : "");
+        }
+        new AlertDialog.Builder(this)
+                .setTitle("Offline-Kartenregion auswählen")
+                .setMessage("Karten werden vom Mapsforge-Mirror geladen, nicht vom öffentlichen OSM-Kachelserver.")
+                .setItems(labels, (dialog, which) -> {
+                    RegionMaps.Region region = regions[which];
+                    if (RegionMaps.downloaded(this, region)) {
+                        RegionMaps.enable(this, region);
+                        OfflineMaps.setEnabled(this, false);
+                        showTab(TAB_MAP);
+                        return;
+                    }
+                    new AlertDialog.Builder(this)
+                            .setTitle(region.label + " herunterladen?")
+                            .setMessage("Download: ca. " + region.size + ". Eine Internetverbindung und entsprechender freier Speicher sind erforderlich. Kartenlizenz: OpenStreetMap ODbL.")
+                            .setNegativeButton("Abbrechen", null)
+                            .setPositiveButton("Herunterladen", (d, w) -> downloadRegion(region))
+                            .show();
+                }).show();
+    }
+
+    private void downloadRegion(RegionMaps.Region region) {
+        if (regionDownloadRunning) { toast("Es läuft bereits ein Download."); return; }
+        regionDownloadRunning = true;
+        android.widget.ProgressBar progress = new android.widget.ProgressBar(this, null,
+                android.R.attr.progressBarStyleHorizontal);
+        progress.setMax(100);
+        progress.setPadding(dp(20), dp(18), dp(20), dp(18));
+        AlertDialog dialog = new AlertDialog.Builder(this)
+                .setTitle("Lade " + region.label)
+                .setMessage("Karte wird auf dem Gerät gespeichert …")
+                .setView(progress)
+                .setCancelable(false)
+                .create();
+        dialog.show();
+        backupExecutor.execute(() -> {
+            try {
+                RegionMaps.download(getApplicationContext(), region, percent ->
+                        runOnUiThread(() -> {
+                            if (!isFinishing() && !isDestroyed()) progress.setProgress(percent);
+                        }));
+                runOnUiThread(() -> {
+                    regionDownloadRunning = false;
+                    if (isFinishing() || isDestroyed()) return;
+                    dialog.dismiss();
+                    RegionMaps.enable(this, region);
+                    OfflineMaps.setEnabled(this, false);
+                    showTab(TAB_MAP);
+                    toast(region.label + " offline verfügbar.");
+                });
+            } catch (Exception error) {
+                runOnUiThread(() -> {
+                    regionDownloadRunning = false;
+                    if (isFinishing() || isDestroyed()) return;
+                    dialog.dismiss();
+                    new AlertDialog.Builder(this)
+                            .setTitle("Download fehlgeschlagen")
+                            .setMessage(error.getMessage())
+                            .setPositiveButton("OK", null).show();
+                });
+            }
+        });
+    }
+
+    private void setupBRouter() {
+        boolean installed = OfflineWalkingRouter.isInstalled(this);
+        new AlertDialog.Builder(this)
+                .setTitle("Offline-Fußwegrouting")
+                .setMessage("RoyalPark kann BRouter auf diesem Smartphone als lokalen Routingdienst verwenden. " +
+                        "Dazu werden die kostenlose BRouter-App und deren regionale Routendaten (.rd5) benötigt. " +
+                        "Diese Routendaten müssen derzeit im BRouter-Downloadmanager geladen werden. " +
+                        "Die RoyalPark-Kartenregion allein enthält keinen vollständigen Routinggraphen. " +
+                        (installed ? "\n\nBRouter ist installiert – im Downloadmanager passende Region auswählen." :
+                                "\n\nBRouter ist noch nicht installiert."))
+                .setNegativeButton("Schließen", null)
+                .setPositiveButton(installed ? "BRouter öffnen" : "BRouter finden", (d, w) -> {
+                    try {
+                        Intent launch = getPackageManager().getLaunchIntentForPackage("btools.routingapp");
+                        if (launch != null) startActivity(launch);
+                        else openUrl("https://f-droid.org/packages/btools.routingapp/");
+                    } catch (Exception ex) { error("BRouter konnte nicht geöffnet werden."); }
+                }).show();
     }
 
     private void importOfflineMap() {

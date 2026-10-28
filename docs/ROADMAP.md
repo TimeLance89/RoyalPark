@@ -29,3 +29,10 @@ Kein Fremdquellcode, keine fremden Grafiken, kein Lizenz-/Aboumgehungscode.
 - Standorttaste zeigt sofort einen frischen vorhandenen Fix und ergänzt ihn asynchron
 - Offen: Geräterealtests verschiedener MBTiles/SQLite/ZIP-Archive und HyperOS-Standort-Performance
 - Offen: Offline-Fußwegroutenberechnung
+
+## 0.8.0
+- Implementiert: vorgegebene DE-Regionen direkt als Mapsforge-Vektordatei herunterladen
+- Implementiert: BRouter-Serviceanbindung und lokale GPX-Routenanzeige (BRouter-App mit .rd5-Daten separat erforderlich)
+- Offen: Ein-Klick-Download derselben Regionen für Vektorkarte **und** BRouter-Segmente innerhalb von RoyalPark
+- Offen: eigene native Offline-Routing-Engine ohne externe installierte App
+- Offen: echte Offline-Wegbeschreibungen mit Sprachausgabe, Device-Tests und dauerhafte APK-Signierung

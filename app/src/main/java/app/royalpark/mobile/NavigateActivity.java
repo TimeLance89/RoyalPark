@@ -66,6 +66,8 @@ public final class NavigateActivity extends Activity
     private TextView stepText;
     private TextView routeDetails;
     private TextView routeButton;
+    private TextView offlineRouteButton;
+    private boolean offlineRouteActive;
     private TextView speechButton;
     private WalkingRouteService.Route route;
     private double targetLat;
@@ -186,9 +188,12 @@ public final class NavigateActivity extends Activity
                 Uri.parse("https://www.openstreetmap.org/copyright"))));
         root.addView(mapFrame, new LinearLayout.LayoutParams(-1, 0, 1));
 
-        routeButton = action("⌁  Fußwegroute berechnen", true);
+        offlineRouteButton = action("⌁  Offline-Fußweg (BRouter)", true);
+        offlineRouteButton.setOnClickListener(v -> calculateOffline());
+        root.addView(offlineRouteButton, new LinearLayout.LayoutParams(-1, dp(47)));
+        routeButton = action("☁  Fußweg online berechnen", false);
         routeButton.setOnClickListener(v -> askBeforeRouting());
-        root.addView(routeButton, new LinearLayout.LayoutParams(-1, dp(49)));
+        root.addView(routeButton, new LinearLayout.LayoutParams(-1, dp(47)));
 
         LinearLayout commands = new LinearLayout(this);
         speechButton = action("🔇  Ansagen: Aus", false);
@@ -207,13 +212,18 @@ public final class NavigateActivity extends Activity
 
     private void askBeforeRouting() {
         if (loading) return;
-        if (OfflineMaps.enabled(this)) {
+        if (OfflineMaps.enabled(this) || RegionMaps.enabled(this)) {
             new AlertDialog.Builder(this)
-                    .setTitle("Offlinekarten aktiv")
-                    .setMessage("Der importierte Kartenbestand funktioniert ohne Internet. Eine neu berechnete Fußwegroute benötigt weiterhin einen Routingdienst im Internet. Der Richtungspfeil ist offline verfügbar.")
-                    .setPositiveButton("Verstanden", null).show();
+                    .setTitle("Offline-Kartenmodus")
+                    .setMessage("Für eine Online-Route muss die Karte selbst nicht online sein. Die Routendaten werden allerdings an Valhalla übertragen. Wenn du vollständig offline bleiben möchtest, nutze die BRouter-Schaltfläche.")
+                    .setPositiveButton("Verstanden", (dialog, which) -> confirmOnlineRoute()).show();
             return;
         }
+        confirmOnlineRoute();
+    }
+
+    private void confirmOnlineRoute() {
+        if (loading) return;
         if (current == null) {
             toast("Zuerst muss dein Standort bestimmt werden.");
             return;
@@ -230,6 +240,42 @@ public final class NavigateActivity extends Activity
                 .setNegativeButton("Abbrechen", null)
                 .setPositiveButton("Route berechnen", (d, which) -> loadRoute())
                 .show();
+    }
+
+    private void calculateOffline() {
+        if (loading) return;
+        if (current == null) { toast("Standort wird noch ermittelt."); return; }
+        if (!OfflineWalkingRouter.isInstalled(this)) {
+            new AlertDialog.Builder(this)
+                    .setTitle("BRouter erforderlich")
+                    .setMessage("Offline-Routen werden lokal durch die kostenlose BRouter-App berechnet. Installiere BRouter und lade dort zunächst die passenden .rd5-Routingsegmente herunter. Die Regionskarte allein reicht nicht aus.")
+                    .setNegativeButton("Abbrechen", null)
+                    .setPositiveButton("BRouter öffnen / installieren", (d, w) -> {
+                        Intent launch = getPackageManager().getLaunchIntentForPackage("btools.routingapp");
+                        if (launch != null) startActivity(launch);
+                        else startActivity(new Intent(Intent.ACTION_VIEW,
+                                Uri.parse("https://f-droid.org/packages/btools.routingapp/")));
+                    }).show();
+            return;
+        }
+        loading = true;
+        offlineRouteButton.setText("Berechne offline …");
+        stepText.setText("BRouter berechnet die Strecke direkt auf diesem Gerät.");
+        boolean started = OfflineWalkingRouter.calculate(this, worker, current.getLatitude(),
+                current.getLongitude(), targetLat, targetLon, (result, error) -> {
+                    if (isFinishing() || isDestroyed()) return;
+                    loading = false;
+                    offlineRouteButton.setText("⟳  Offline-Fußweg neu berechnen");
+                    if (result != null) displayRoute(result, true);
+                    else {
+                        stepText.setText("Keine Offline-Route – Kompass funktioniert weiterhin.");
+                        routeDetails.setText(error == null ? "BRouter-Daten prüfen." : error);
+                    }
+                });
+        if (!started) {
+            loading = false;
+            offlineRouteButton.setText("⌁  Offline-Fußweg (BRouter)");
+        }
     }
 
     private void loadRoute() {
@@ -253,42 +299,50 @@ public final class NavigateActivity extends Activity
             runOnUiThread(() -> {
                 if (isFinishing() || isDestroyed()) return;
                 loading = false;
-                routeButton.setText("⟳  Fußwegroute aktualisieren");
+                routeButton.setText("⟳  Online-Fußweg aktualisieren");
                 if (result == null) {
-                    stepText.setText("Routing nicht verfügbar – Kompassnavigation bleibt aktiv.");
+                    stepText.setText("Online-Routing nicht verfügbar – Kompass bleibt aktiv.");
                     routeDetails.setText(failure == null ? "Verbindung fehlgeschlagen" : failure);
                     return;
                 }
-                route = result;
-                routeProgressIndex = 0;
-                lastSpokenStep = -1;
-                List<GeoPoint> path = new ArrayList<>();
-                for (RouteGeometry.Point p : result.coordinates)
-                    path.add(new GeoPoint(p.lat, p.lon));
-                routeLine.setPoints(path);
-                pointerLine.setPoints(new ArrayList<>());
-                routeDetails.setText(String.format(Locale.GERMANY,
-                        "Fußweg: %.1f km · ca. %d Min · FOSSGIS/Valhalla",
-                        result.lengthKm, Math.round(result.durationSeconds / 60)));
-                if (!path.isEmpty()) {
-                    double north = -90, south = 90, west = 180, east = -180;
-                    for (GeoPoint p : path) {
-                        north = Math.max(north, p.getLatitude());
-                        south = Math.min(south, p.getLatitude());
-                        east = Math.max(east, p.getLongitude());
-                        west = Math.min(west, p.getLongitude());
-                    }
-                    map.zoomToBoundingBox(new BoundingBox(
-                            Math.min(90, north + 0.001),
-                            Math.min(180, east + 0.001),
-                            Math.max(-90, south - 0.001),
-                            Math.max(-180, west - 0.001)), true, dp(40));
-                    cameraCentered = true;
-                }
-                updateGuidance();
-                map.invalidate();
+                displayRoute(result, false);
             });
         });
+    }
+
+    private void displayRoute(WalkingRouteService.Route result, boolean offline) {
+        route = result;
+        offlineRouteActive = offline;
+        routeProgressIndex = 0;
+        lastSpokenStep = -1;
+        List<GeoPoint> path = new ArrayList<>();
+        for (RouteGeometry.Point p : result.coordinates) path.add(new GeoPoint(p.lat, p.lon));
+        routeLine.setPoints(path);
+        pointerLine.setPoints(new ArrayList<>());
+        routeDetails.setText(String.format(Locale.GERMANY,
+                "Fußweg: %.1f km · ca. %d Min · %s",
+                result.lengthKm, Math.round(result.durationSeconds / 60),
+                offline ? "Offline / BRouter" : "FOSSGIS / Valhalla"));
+        if (offline) {
+            stepText.setText("BRouter-Route bereit. Folge der türkisfarbenen Linie; offline sind keine Abbiegetexte verfügbar.");
+        }
+        if (!path.isEmpty()) {
+            double north = -90, south = 90, west = 180, east = -180;
+            for (GeoPoint p : path) {
+                north = Math.max(north, p.getLatitude());
+                south = Math.min(south, p.getLatitude());
+                east = Math.max(east, p.getLongitude());
+                west = Math.min(west, p.getLongitude());
+            }
+            map.zoomToBoundingBox(new BoundingBox(
+                    Math.min(90, north + 0.001),
+                    Math.min(180, east + 0.001),
+                    Math.max(-90, south - 0.001),
+                    Math.max(-180, west - 0.001)), true, dp(40));
+            cameraCentered = true;
+        }
+        updateGuidance();
+        map.invalidate();
     }
 
     private void toggleSpeech() {
@@ -423,7 +477,9 @@ public final class NavigateActivity extends Activity
             }
         }
         if (route.steps.isEmpty()) {
-            stepText.setText("Fußweg eingezeichnet. Folge der türkisen Route.");
+            stepText.setText(offlineRouteActive
+                    ? "Offline-Fußweg eingezeichnet. Folge der türkisen Route."
+                    : "Fußweg eingezeichnet. Folge der türkisen Route.");
             return;
         }
         WalkingRouteService.Step step = route.steps.get(stepNumber);

@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.8.0 · 28. Oktober 2026
+- Direkter Download ausgewählter deutscher Offline-Vektorkarten aus dem Mapsforge-Hochschulmirror
+- Fortschrittsanzeige, Größenbegrenzung, Kartenheaderprüfung und lokale Speicherung
+- Darstellung offline über osmdroid-mapsforge, unabhängig vom OSM-Tileserver
+- BRouter als lokaler Android-Routingdienst via AIDL; Fußweg wird offline berechnet, GPX-Koordinaten in RoyalPark dargestellt
+- Separate Buttons für Online-/Offline-Fußwege, verständliche Voraussetzungen bei fehlenden .rd5-Segmenten
+- Bestehende Rasterkarte, Parkplätze und Kompass bleiben erhalten
+
 ## 0.7.0 · 28. Oktober 2026
 - Schnellere Positionierung mit letzter ausreichend frischer Systemposition, danach Aktualisierung mit frischem Fix
 - Netzwerk-Fallback 1,2 s statt 8 s, Timeout 12 statt 20 s

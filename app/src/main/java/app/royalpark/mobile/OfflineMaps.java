@@ -179,6 +179,7 @@ public final class OfflineMaps {
      * When offline due to network loss, a legal imported archive is used automatically.
      */
     public static boolean apply(Context context, MapView map) {
+        if (RegionMaps.apply(context, map)) return true;
         boolean offline = enabled(context) || !connected(context);
         File archiveFile = installedFile(context);
         if (offline && archiveFile != null && archiveFile.length() > 0) {
