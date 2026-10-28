@@ -94,6 +94,8 @@ public final class MainActivity extends Activity {
     private ImageButton locationButton;
     private Marker myLocationMarker;
     private boolean locatingNow;
+    /** Keep the map usable by collapsing secondary actions until explicitly requested. */
+    private boolean parkingDetailsExpanded = false;
     private boolean regionDownloadRunning;
     private Location deviceLocation;
     private Runnable afterPermission;
@@ -449,12 +451,13 @@ public final class MainActivity extends Activity {
         canvas.addView(layers, floatingAt(110, 44,
                 Gravity.TOP | Gravity.RIGHT, 0, 14, 14, 0));
 
-        TextView history = text("◷  Verlauf", 13, WHITE, true);
+        TextView history = text("◷", 22, WHITE, true);
         history.setGravity(Gravity.CENTER);
+        history.setContentDescription("Parkverlauf öffnen");
         history.setBackground(surface(Color.WHITE, Color.rgb(227, 236, 237), 18));
         history.setElevation(dp(3));
         history.setOnClickListener(v -> showTab(TAB_HISTORY));
-        canvas.addView(history, floatingAt(104, 37,
+        canvas.addView(history, floatingAt(43, 41,
                 Gravity.TOP | Gravity.LEFT, 14, 67, 0, 0));
 
         if (deviceLocation != null) {
@@ -469,43 +472,47 @@ public final class MainActivity extends Activity {
             gps.setElevation(dp(3));
             FrameLayout.LayoutParams gpsParams = new FrameLayout.LayoutParams(
                     -2, dp(32), Gravity.TOP | Gravity.LEFT);
-            gpsParams.setMargins(dp(14), dp(111), 0, 0);
+            gpsParams.setMargins(dp(65), dp(71), 0, 0);
             canvas.addView(gps, gpsParams);
         }
 
-        // One slim, unified camera control rail.
-        LinearLayout cameras = column();
-        cameras.setPadding(dp(4), dp(5), dp(4), dp(5));
-        cameras.setGravity(Gravity.CENTER);
-        cameras.setBackground(surface(Color.WHITE, Color.rgb(223, 233, 236), 20));
-        cameras.setElevation(dp(5));
+        // Smart map controls: one horizontal cluster, not a tall rail that covers the map.
+        LinearLayout cameraBar = row();
+        cameraBar.setGravity(Gravity.CENTER_VERTICAL);
+        cameraBar.setBackground(surface(Color.WHITE, Color.rgb(223, 233, 236), 18));
+        cameraBar.setElevation(dp(5));
+        cameraBar.setPadding(dp(4), dp(2), dp(4), dp(2));
         locationButton = new ImageButton(this);
         locationButton.setImageResource(R.drawable.ic_my_location);
         locationButton.setColorFilter(ACCENT_DARK);
         locationButton.setScaleType(ImageView.ScaleType.CENTER_INSIDE);
-        locationButton.setPadding(dp(12), dp(12), dp(12), dp(12));
+        locationButton.setPadding(dp(10), dp(10), dp(10), dp(10));
         locationButton.setContentDescription("Mein Standort");
-        locationButton.setBackground(shape(Color.TRANSPARENT, 18));
+        locationButton.setBackground(shape(Color.TRANSPARENT, 14));
         locationButton.setOnClickListener(v -> showMyLocation());
-        cameras.addView(locationButton, new LinearLayout.LayoutParams(dp(50), dp(50)));
-        View divider1 = new View(this);
-        divider1.setBackgroundColor(0xFFE8F1F2);
-        cameras.addView(divider1, new LinearLayout.LayoutParams(-1, dp(1)));
-        TextView focusCar = text("Auto", 12, ACCENT_DARK, true);
-        focusCar.setGravity(Gravity.CENTER);
-        focusCar.setContentDescription("Parkplatz nah anzeigen");
-        focusCar.setOnClickListener(v -> focusParked());
-        cameras.addView(focusCar, new LinearLayout.LayoutParams(dp(50), dp(44)));
-        View divider2 = new View(this);
-        divider2.setBackgroundColor(0xFFE8F1F2);
-        cameras.addView(divider2, new LinearLayout.LayoutParams(-1, dp(1)));
-        TextView focusBoth = text("Beide", 12, ACCENT_DARK, true);
-        focusBoth.setGravity(Gravity.CENTER);
-        focusBoth.setContentDescription("Auto und meinen Standort gemeinsam anzeigen");
-        focusBoth.setOnClickListener(v -> focusBoth());
-        cameras.addView(focusBoth, new LinearLayout.LayoutParams(dp(50), dp(44)));
-        canvas.addView(cameras, floatingAt(58, 147,
-                Gravity.TOP | Gravity.RIGHT, 0, 74, 14, 0));
+        cameraBar.addView(locationButton, new LinearLayout.LayoutParams(dp(45), dp(43)));
+        if (active != null) {
+            View cut1 = new View(this);
+            cut1.setBackgroundColor(0xFFE4EFEF);
+            cameraBar.addView(cut1, new LinearLayout.LayoutParams(dp(1), dp(24)));
+            TextView focusCar = text("Auto", 13, ACCENT_DARK, true);
+            focusCar.setGravity(Gravity.CENTER);
+            focusCar.setContentDescription("Parkplatz nah anzeigen");
+            focusCar.setOnClickListener(v -> focusParked());
+            cameraBar.addView(focusCar, new LinearLayout.LayoutParams(dp(47), dp(43)));
+            View cut2 = new View(this);
+            cut2.setBackgroundColor(0xFFE4EFEF);
+            cameraBar.addView(cut2, new LinearLayout.LayoutParams(dp(1), dp(24)));
+            TextView focusBoth = text("Beide", 13, ACCENT_DARK, true);
+            focusBoth.setGravity(Gravity.CENTER);
+            focusBoth.setContentDescription("Parkplatz und eigene Position anzeigen");
+            focusBoth.setOnClickListener(v -> focusBoth());
+            cameraBar.addView(focusBoth, new LinearLayout.LayoutParams(dp(55), dp(43)));
+        }
+        FrameLayout.LayoutParams cameraParams = new FrameLayout.LayoutParams(
+                -2, dp(48), Gravity.TOP | Gravity.RIGHT);
+        cameraParams.setMargins(0, dp(67), dp(14), 0);
+        canvas.addView(cameraBar, cameraParams);
         locationStatus = text("", 12, WHITE, true);
         locationStatus.setPadding(dp(12), dp(7), dp(12), dp(7));
         locationStatus.setBackground(shape(Color.WHITE, 14));
@@ -513,7 +520,7 @@ public final class MainActivity extends Activity {
         locationStatus.setVisibility(View.GONE);
         FrameLayout.LayoutParams statusParams = new FrameLayout.LayoutParams(
                 -2, -2, Gravity.TOP | Gravity.RIGHT);
-        statusParams.setMargins(0, dp(229), dp(14), 0);
+        statusParams.setMargins(0, dp(121), dp(14), 0);
         canvas.addView(locationStatus, statusParams);
 
         LinearLayout sheet = card();
@@ -549,8 +556,8 @@ public final class MainActivity extends Activity {
             LinearLayout heading = column();
             line(heading, "DEIN PARKPLATZ", 11, ACCENT_DARK, true, 0);
             line(heading, "Dein Auto steht hier", 21, WHITE, true, 4);
-            line(heading, "Geparkt " + DateUtils.getRelativeTimeSpanString(
-                    active.parkedAt, System.currentTimeMillis(), DateUtils.MINUTE_IN_MILLIS),
+            line(heading, ParkingPresentation.ageText(
+                    active.parkedAt, System.currentTimeMillis()),
                     12, MUTED, false, 4);
             headingRow.addView(heading, new LinearLayout.LayoutParams(0, -2, 1));
             TextView more = text("···", 24, MUTED, true);
@@ -576,17 +583,36 @@ public final class MainActivity extends Activity {
                     13, ACCENT_DARK, true, 5);
 
             actionLine(sheet, "➤  Route zu meinem Auto", true, () -> navigate(active));
+            // Secondary actions are available on demand; the map remains front and center.
+            LinearLayout extras = column();
             LinearLayout shortcuts = row();
             LinearLayout.LayoutParams p = new LinearLayout.LayoutParams(0, dp(58), 1);
-            TextView timerButton = quickAction("◷", "Parkuhr", () -> timer(active));
-            shortcuts.addView(timerButton, p);
+            shortcuts.addView(quickAction("◷", "Parkuhr", () -> timer(active)), p);
             LinearLayout.LayoutParams p2 = new LinearLayout.LayoutParams(0, dp(58), 1);
             p2.leftMargin = dp(8);
             shortcuts.addView(quickAction("✎", "Notiz", () -> editNote(active)), p2);
             LinearLayout.LayoutParams p3 = new LinearLayout.LayoutParams(0, dp(58), 1);
             p3.leftMargin = dp(8);
             shortcuts.addView(quickAction("▣", "Foto", () -> photo(active)), p3);
-            margin(sheet, shortcuts, 9);
+            margin(extras, shortcuts, 4);
+            TextView moreOptions = text("Parkhaus · Teilen · Verlauf  →", 13, ACCENT_DARK, true);
+            moreOptions.setGravity(Gravity.CENTER);
+            moreOptions.setOnClickListener(v -> showParkingMore(active));
+            margin(extras, moreOptions, 10);
+            extras.setVisibility(parkingDetailsExpanded ? View.VISIBLE : View.GONE);
+            TextView expand = text(parkingDetailsExpanded ? "Weniger anzeigen  ⌃"
+                    : "Weitere Aktionen  ⌄", 13, ACCENT_DARK, true);
+            expand.setGravity(Gravity.CENTER);
+            expand.setMinHeight(dp(38));
+            expand.setContentDescription("Zusätzliche Parkplatzaktionen ein- oder ausblenden");
+            expand.setOnClickListener(v -> {
+                parkingDetailsExpanded = !parkingDetailsExpanded;
+                extras.setVisibility(parkingDetailsExpanded ? View.VISIBLE : View.GONE);
+                expand.setText(parkingDetailsExpanded ? "Weniger anzeigen  ⌃"
+                        : "Weitere Aktionen  ⌄");
+            });
+            margin(sheet, expand, 6);
+            margin(sheet, extras, 0);
         }
         ScrollView sheetScroll = new ScrollView(this);
         sheetScroll.setVerticalScrollBarEnabled(false);
@@ -717,6 +743,16 @@ public final class MainActivity extends Activity {
                 }).show();
     }
 
+    private String installedVersion() {
+        try {
+            android.content.pm.PackageInfo packageInfo =
+                    getPackageManager().getPackageInfo(getPackageName(), 0);
+            return packageInfo.versionName == null ? "unbekannt" : packageInfo.versionName;
+        } catch (Exception exception) {
+            return "unbekannt";
+        }
+    }
+
     private void showSettings(LinearLayout content) {
         line(content, "Einstellungen", 24, WHITE, true, 6);
         line(content, "Alles lokal. Alle Funktionen in deiner Hand.", 14, MUTED, false, 8);
@@ -842,7 +878,7 @@ public final class MainActivity extends Activity {
             startActivity(intent);
         });
         margin(content, privacy, 16);
-        line(content, "ROYALPARK 0.9.0  ·  Eigenständiger Neubau", 12, MUTED, false, 25);
+        line(content, "RoyalPark · Version " + installedVersion(), 12, MUTED, false, 25);
     }
 
     private void ensureLocation(Runnable action) {
@@ -961,8 +997,10 @@ public final class MainActivity extends Activity {
         double meters = NavigationMath.distanceMeters(
                 spot.latitude, spot.longitude,
                 deviceLocation.getLatitude(), deviceLocation.getLongitude());
-        parkingDistanceLine.setText("⌖  " + NavigationMath.formatDistance(meters)
-                + " Luftlinie zum Auto · beide anzeigen");
+        parkingDistanceLine.setText("⌖  " + ParkingPresentation.distanceText(
+                meters, deviceLocation.hasAccuracy() ? deviceLocation.getAccuracy() : Float.NaN,
+                LocationGateway.hasPrecisePermission(this),
+                ParkingAccuracy.SOURCE_APPROXIMATE.equals(spot.source)) + " · beide anzeigen");
     }
 
     private void focusParked() {
@@ -1040,9 +1078,10 @@ public final class MainActivity extends Activity {
         for (int i=0; i<regions.length; i++) {
             labels[i] = regions[i].display() + (RegionMaps.downloaded(this, regions[i]) ? " · installiert" : "");
         }
+        // Android AlertDialog cannot show a message and an item list together reliably:
+        // setMessage() masks setItems() on some themes (observed on Xiaomi/HyperOS).
         new AlertDialog.Builder(this)
-                .setTitle("Offline-Kartenregion auswählen")
-                .setMessage("Karten werden vom Mapsforge-Mirror geladen, nicht vom öffentlichen OSM-Kachelserver.")
+                .setTitle("Offline-Kartenregion")
                 .setItems(labels, (dialog, which) -> {
                     RegionMaps.Region region = regions[which];
                     if (RegionMaps.downloaded(this, region)) {
@@ -1057,7 +1096,9 @@ public final class MainActivity extends Activity {
                             .setNegativeButton("Abbrechen", null)
                             .setPositiveButton("Herunterladen", (d, w) -> downloadRegion(region))
                             .show();
-                }).show();
+                })
+                .setNegativeButton("Schließen", null)
+                .show();
     }
 
     private void downloadRegion(RegionMaps.Region region) {

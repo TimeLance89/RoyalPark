@@ -1,5 +1,16 @@
 # Changelog
 
+## 1.2.0 · 28. Oktober 2026
+- Einstellungsseite zeigt dynamisch die tatsächlich installierte Versionsnummer statt eines veralteten statischen Textes.
+- Der Zusatz „Eigenständiger Neubau“ wurde aus der Oberfläche entfernt.
+- Behoben: Offline-Kartenregionenauswahl zeigt wieder alle Regionen statt eines leeren Dialogs (Android setMessage() verdeckte setItems()).
+- Drei große vertikale Kartenbuttons durch eine kompakte horizontale Kartensteuerung ersetzt; bei fehlendem Parkplatz erscheint nur der Standortbutton.
+- Der Verlaufsknopf ist kleiner und gibt mehr Kartenfläche frei.
+- Parkplatzkarte startet eingeklappt mit den wichtigsten Angaben und Route; weitere Aktionen sind aufklappbar, ohne die Karte neu zu laden.
+- Unpräzise GPS-Ortung wird nicht mehr als scheinbar exakte „0 m zum Auto“ dargestellt.
+- Natürlichere Parkdauer („Gerade geparkt“, „Seit 5 Min. geparkt“).
+- JUnit-Tests für Entfernungshinweise und Parkdauer.
+
 ## 1.1.0 · 28. Oktober 2026
 - Erststart-Onboarding mit vier eigenständigen, überspringbaren Seiten
 - Standortberechtigung nur auf Benutzeraktion, keine automatische Aktivierung der Fahrzeugüberwachung

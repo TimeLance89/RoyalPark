@@ -1,4 +1,4 @@
-# RoyalPark v1.1.0 — moderner erster Start
+# RoyalPark v1.2.0 — moderner erster Start
 
 RoyalPark ist eine unabhängige Android-App für Parkplatzspeicherung, Parkuhr, Karten und Online-/Offline-Fußwegnavigation. Keine Registrierung, kein Konto und keine eigenen Tracking-Server.
 
@@ -27,3 +27,14 @@ Die Kartendarstellung nutzt importierte Rasterkarten bzw. Mapsforge-Regionsdatei
 GitHub Actions erstellt Debug- und nicht debuggable Release-Builds. VersionCode 12. Die Release-APK wird mit demselben privaten Zertifikat signiert wie RoyalPark 1.0.x, nicht mit einem Debug-Zertifikat.
 
 Die reale Kontrolle auf Android/HyperOS, inklusive kleiner Displays, gedrehter Ausrichtung und Schriftgrößen, steht noch aus.
+
+
+## Version 1.2.0 – smartere Bedienung
+- **Einstellungen:** Die angezeigte Version wird live aus den installierten Paketinformationen gelesen. Keine veraltete fest codierte Nummer, keine Entwicklungsbezeichnung im UI.
+- **Karte:** Ich/Auto/Beide sind eine platzsparende horizontale Steuerung. Ohne gespeichertes Auto erscheint nur der GPS-Knopf.
+- **Parkplatzkarte:** Zeigt standardmäßig nur Parkstatus, Entfernung und Route. Parkuhr/Notiz/Foto/weitere Aktionen werden bewusst durch „Weitere Aktionen“ aufgeklappt, ohne die Karte oder aktuelle Position neu zu laden.
+- **Standortdaten:** Eine GPS-Genauigkeit von beispielsweise ±71 Metern darf nicht als exakt „0 m zum Auto“ verstanden werden. Die App zeigt dann einen Unsicherheitshinweis; mit guter Ortung gibt es die tatsächliche Luftlinienentfernung.
+- **Parkzeit:** „Gerade geparkt“ statt „Vor 0 Minuten“.
+- **Offline-Regionen:** Die Regionsliste erscheint wieder vollständig: Der Android-AlertDialog darf hierfür nicht gleichzeitig setMessage() und setItems() verwenden.
+- **Kompatibilität:** Kein neues Datenbankschema, VersionCode 13. Die reguläre signierte Release-Linie bleibt bestehen.
+- Android-/HyperOS-UI-Gerätetests und Download-Tests für konkrete Mapsforge-Regionen stehen noch aus.

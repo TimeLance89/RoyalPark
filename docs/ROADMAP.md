@@ -52,3 +52,10 @@ Kein Fremdquellcode, keine fremden Grafiken, kein Lizenz-/Aboumgehungscode.
 6. Stabilere Offlinekarte einschließlich Download-Integritätsprüfung, Segmentverwaltung und besserer lokaler Routingintegration.
 7. Sichere Datenportabilität inklusive verschlüsselter Backups, optionaler selbst gehosteter Synchronisation.
 8. Barrierefreiheit und UI-Tests, Energiesparverhalten, reproduzierbare Release-Builds.
+
+## 1.2.0 – UX und Korrektheit
+- Einstellungsseiten-Version dynamisch aus PackageManager statt fest kodiert.
+- Schlanke Kartenelemente und ein ein-/ausklappbarer sekundärer Aktionsbereich.
+- Offline-Regionenauswahl auf Xiaomi repariert (setMessage verdeckte setItems).
+- Entfernung mit GPS-Unsicherheit und natürliche Parkdauer in einer getesteten Präsentationslogik.
+- Offen: UI-Tests auf kleinen Displays, Bildschirmrotation und größere Schrift; Betrieb ohne Netzwerk.
