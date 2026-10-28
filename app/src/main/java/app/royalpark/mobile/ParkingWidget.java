@@ -21,6 +21,8 @@ public final class ParkingWidget extends AppWidgetProvider {
         ComponentName provider = new ComponentName(context, ParkingWidget.class);
         int[] ids = manager.getAppWidgetIds(provider);
         if (ids != null && ids.length > 0) render(context, manager, ids);
+        QuickSaveWidget.updateAll(context);
+        ParkingTimerWidget.updateAll(context);
     }
 
     private static void render(Context context, AppWidgetManager manager, int[] ids) {

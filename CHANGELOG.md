@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.4.0 · 28. Oktober 2026
+- Original-Funktionsparität erweitert: optionale Bewegungserkennung beim Aussteigen (Activity Recognition Transition API)
+- Bluetooth- und Bewegungserkennung teilen einen deduplizierten Speicherungspfad und die lokale Parkplatzhistorie
+- Drei Android-Widgets wie in der Referenz: aktueller Parkplatz, Schnell-Speichern und Parkuhr
+- Fotoverwaltung: Foto betrachten, ersetzen und Verknüpfung entfernen
+- Aktivitätserkennung mit eigener Android-Berechtigung und explizitem Start/Stop; Google Play-Dienste erforderlich
+- Bewusster Schutz vor mehreren Erkennungen innerhalb von zwei Minuten
+- Datenbankschema bleibt unverändert, bestehende Parkplatzdaten werden beibehalten
+
 ## 0.3.0 · 27. Oktober 2026
 - Oberfläche umfassend an die Referenzansichten angeglichen: helle Kartenansicht statt dunklem Dashboard
 - Karte als Hauptfläche mit schwebenden Einstellungen, Verlauf, Karteninfo und Standortaktualisierung

@@ -1,4 +1,4 @@
-# RoyalPark – unabhängige Android-Parkplatz-App (v0.3.0)
+# RoyalPark – unabhängige Android-Parkplatz-App (v0.4.0)
 
 Eigenständige, deutschsprachige Neuentwicklung anhand der Funktionsanalyse von „Mein Auto finden“ 1.1.15. Fremde APK-Ressourcen oder dekompilierter Programmcode wurden nicht übernommen.
 
@@ -32,3 +32,10 @@ Android Studio: JDK 17, Gradle 8.11.1, compileSdk 35, targetSdk 35. Der Gradle-W
 
 ## UI 0.3.0
 Die Oberfläche folgt nun der originalen hellen, kartenbasierten Navigation aus den offiziellen Store-Bildern: Fullscreen-OSM-Karte, schwebende Schaltflächen und weißes Parkplatz-Bottom-Sheet. Noch nicht pixelgenau auf einem realen Testgerät verifiziert.
+
+
+## Funktionsausbau 0.4.0
+- **Fahrzeug verlassen:** Bewegungserkennung über Google Play Services Activity Recognition mit gesonderter Berechtigung, kombinierbar mit Bluetooth. Beide Quellen speichern nur bei laufendem Vordergrunddienst. Android kann die Erkennung einschränken; sie ist nicht garantiert.
+- **Drei Widgets:** aktueller Parkplatz, ein Tap zum Öffnen der GPS-Speicherung und Parkuhrstatus. Schnell-Speichern öffnet die App, fragt nötige Berechtigungen ab und speichert danach.
+- **Fotoverwaltung:** vorhandenes Parkplatzfoto ansehen, ersetzen oder die Verknüpfung entfernen.
+- Die neue Funktion benötigt Google Play-Dienste und `ACTIVITY_RECOGNITION`. Keine serverseitige Datensammlung.

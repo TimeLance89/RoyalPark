@@ -69,6 +69,7 @@ public final class MainActivity extends Activity {
     private static final int REQ_NOTIFICATIONS = 102;
     private static final int REQ_PHOTO = 103;
     private static final int REQ_CAMERA = 104;
+    private static final int REQ_MOTION = 105;
     private static final int TAB_MAP = 0;
     private static final int TAB_HISTORY = 1;
     private static final int TAB_SETTINGS = 2;
@@ -124,20 +125,29 @@ public final class MainActivity extends Activity {
         bottomBar.setBackgroundColor(CARD);
         mainRoot.addView(bottomBar);
         showTab(TAB_MAP);
-        handleQuickSave(getIntent());
+        handleWidgetAction(getIntent());
     }
 
-    private void handleQuickSave(Intent intent) {
-        if (intent != null && ParkingWidget.QUICK_SAVE.equals(intent.getAction())) {
+    private void handleWidgetAction(Intent intent) {
+        if (intent == null) return;
+        String action = intent.getAction();
+        if (ParkingWidget.QUICK_SAVE.equals(action)) {
             intent.setAction(null);
             mainRoot.post(this::saveCurrent);
+        } else if (ParkingTimerWidget.OPEN_TIMER.equals(action)) {
+            intent.setAction(null);
+            mainRoot.post(() -> {
+                ParkingSpot spot = store.active();
+                if (spot == null) toast("Bitte zuerst einen Parkplatz speichern.");
+                else timer(spot);
+            });
         }
     }
 
     @Override protected void onNewIntent(Intent intent) {
         super.onNewIntent(intent);
         setIntent(intent);
-        handleQuickSave(intent);
+        handleWidgetAction(intent);
     }
 
     @Override protected void onSaveInstanceState(Bundle out) {
@@ -463,7 +473,7 @@ public final class MainActivity extends Activity {
         for (ParkingSpot spot : history) {
             LinearLayout item = card();
             boolean isActive = active != null && active.id == spot.id;
-            line(item, (isActive ? "●  AKTUELL  ·  " : "") + ("BLUETOOTH".equals(spot.source) ? "Automatisch" : "Manuell"),
+            line(item, (isActive ? "●  AKTUELL  ·  " : "") + (("BLUETOOTH".equals(spot.source) || "MOTION".equals(spot.source)) ? "Automatisch" : "Manuell"),
                     12, isActive ? ACCENT : MUTED, true, 0);
             line(item, format(spot.parkedAt), 17, WHITE, true, 7);
             line(item, String.format(Locale.GERMANY, "%.5f, %.5f", spot.latitude, spot.longitude),
@@ -503,9 +513,24 @@ public final class MainActivity extends Activity {
         boolean enabled = prefs.getBoolean("auto_enabled", false);
         actionLine(bluetooth, enabled ? "■  Überwachung stoppen" : "▶  Überwachung starten", true,
                 enabled ? this::stopAuto : this::startAuto);
-        line(bluetooth, "Erfordert Standort- und Bluetooth-Berechtigung sowie eine dauerhaft sichtbare Dienstmeldung. Nach einem Neustart bitte erneut aktivieren.",
+        line(bluetooth, "Erfordert Standort- und gegebenenfalls Bluetooth-Berechtigung sowie eine sichtbare Dienstmeldung. Nach Neustart erneut einschalten.",
                 12, MUTED, false, 10);
         margin(content, bluetooth, 18);
+        LinearLayout movement = card();
+        line(movement, "BEWEGUNGSERKENNUNG", 12, ACCENT_DARK, true, 0);
+        line(movement, "Beim Aussteigen automatisch speichern", 18, WHITE, true, 8);
+        line(movement, "Erkennt über Google Play-Dienste den Wechsel von Autofahrt zu Fußweg. Kann irrtümlich auslösen und benötigt eine aktive Überwachung.",
+                14, MUTED, false, 8);
+        boolean motion = prefs.getBoolean("motion_enabled", false);
+        actionLine(movement, motion ? "✓  Aktiv – ausschalten" : "○  Aktivitätserkennung einschalten",
+                false, this::toggleMotion);
+        if (motion) {
+            line(movement, prefs.getString("motion_status", "Überwachung noch nicht gestartet"),
+                    12, MUTED, false, 8);
+        }
+        line(movement, "Du kannst Bluetooth und Bewegung gemeinsam verwenden. Doppelte Erkennungen werden unterdrückt.",
+                12, MUTED, false, 10);
+        margin(content, movement, 16);
         LinearLayout privacy = card();
         line(privacy, "DATENSCHUTZ", 12, ACCENT, true, 0);
         line(privacy, "Kein Konto. Kein Tracking. Keine Werbung.", 17, WHITE, true, 7);
@@ -518,7 +543,7 @@ public final class MainActivity extends Activity {
             startActivity(intent);
         });
         margin(content, privacy, 16);
-        line(content, "ROYALPARK 0.3.0  ·  Eigenständiger Neubau", 12, MUTED, false, 25);
+        line(content, "ROYALPARK 0.4.0  ·  Eigenständiger Neubau", 12, MUTED, false, 25);
     }
 
     private void ensureLocation(Runnable action) {
@@ -625,10 +650,32 @@ public final class MainActivity extends Activity {
 
     private void photo(ParkingSpot spot) {
         photoSpotId = spot.id;
-        new AlertDialog.Builder(this)
-                .setTitle("Parkplatzfoto")
-                .setItems(new String[]{"Foto aufnehmen", "Aus Galerie auswählen"}, (dialog, which) -> {
-                    if (which == 0) takePhoto(); else choosePhoto();
+        boolean hasPhoto = spot.photoUri != null && !spot.photoUri.isEmpty();
+        String[] actions = hasPhoto ? new String[]{
+                "Foto anzeigen", "Neues Foto aufnehmen", "Aus Galerie auswählen", "Foto entfernen"
+        } : new String[]{"Foto aufnehmen", "Aus Galerie auswählen"};
+        new AlertDialog.Builder(this).setTitle("Parkplatzfoto")
+                .setItems(actions, (dialog, which) -> {
+                    if (!hasPhoto) {
+                        if (which == 0) takePhoto(); else choosePhoto();
+                    } else if (which == 0) {
+                        try {
+                            Intent open = new Intent(Intent.ACTION_VIEW, Uri.parse(spot.photoUri));
+                            open.setDataAndType(Uri.parse(spot.photoUri), "image/*");
+                            open.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION);
+                            startActivity(open);
+                        } catch (Exception e) { error("Das Foto konnte nicht geöffnet werden."); }
+                    } else if (which == 1) takePhoto();
+                    else if (which == 2) choosePhoto();
+                    else new AlertDialog.Builder(this)
+                            .setTitle("Parkplatzfoto entfernen?")
+                            .setMessage("Die Verknüpfung wird gelöscht. Originalfotos in deiner Galerie bleiben erhalten.")
+                            .setNegativeButton("Abbrechen", null)
+                            .setPositiveButton("Entfernen", (d, w) -> {
+                                store.setPhoto(spot.id, "");
+                                ParkingWidget.updateAll(this);
+                                showTab(currentTab);
+                            }).show();
                 }).show();
     }
 
@@ -724,16 +771,52 @@ public final class MainActivity extends Activity {
         }
     }
 
+    private void toggleMotion() {
+        boolean currentlyEnabled = prefs.getBoolean("motion_enabled", false);
+        if (currentlyEnabled) {
+            prefs.edit().putBoolean("motion_enabled", false)
+                    .putString("motion_status", "").apply();
+            if (prefs.getBoolean("auto_enabled", false)) stopAuto();
+            showTab(TAB_SETTINGS);
+            return;
+        }
+        if (Build.VERSION.SDK_INT >= 29
+                && checkSelfPermission(Manifest.permission.ACTIVITY_RECOGNITION)
+                        != PackageManager.PERMISSION_GRANTED) {
+            afterPermission = () -> {
+                prefs.edit().putBoolean("motion_enabled", true).apply();
+                showTab(TAB_SETTINGS);
+                toast("Bewegungserkennung aktiviert. Überwachung noch starten.");
+            };
+            requestPermissions(new String[]{Manifest.permission.ACTIVITY_RECOGNITION}, REQ_MOTION);
+            return;
+        }
+        prefs.edit().putBoolean("motion_enabled", true).apply();
+        if (prefs.getBoolean("auto_enabled", false)) stopAuto();
+        showTab(TAB_SETTINGS);
+        toast("Bewegungserkennung ausgewählt. Überwachung noch starten.");
+    }
+
     private void startAuto() {
-        if (prefs.getString("auto_mac", "").isEmpty()) {
-            error("Bitte zuerst dein Auto-Bluetoothgerät auswählen.");
+        if (prefs.getString("auto_mac", "").isEmpty() &&
+                !prefs.getBoolean("motion_enabled", false)) {
+            error("Bluetoothgerät auswählen oder Bewegungserkennung aktivieren.");
             return;
         }
         ensureLocation(() -> {
-            if (Build.VERSION.SDK_INT >= 31
+            if (!prefs.getString("auto_mac", "").isEmpty()
+                    && Build.VERSION.SDK_INT >= 31
                     && checkSelfPermission(Manifest.permission.BLUETOOTH_CONNECT) != PackageManager.PERMISSION_GRANTED) {
                 afterPermission = this::startAuto;
                 requestPermissions(new String[]{Manifest.permission.BLUETOOTH_CONNECT}, REQ_BT);
+                return;
+            }
+            if (prefs.getBoolean("motion_enabled", false)
+                    && Build.VERSION.SDK_INT >= 29
+                    && checkSelfPermission(Manifest.permission.ACTIVITY_RECOGNITION)
+                        != PackageManager.PERMISSION_GRANTED) {
+                afterPermission = this::startAuto;
+                requestPermissions(new String[]{Manifest.permission.ACTIVITY_RECOGNITION}, REQ_MOTION);
                 return;
             }
             try {
@@ -766,11 +849,11 @@ public final class MainActivity extends Activity {
         super.onRequestPermissionsResult(requestCode, permissions, results);
         boolean granted = false;
         for (int result : results) if (result == PackageManager.PERMISSION_GRANTED) granted = true;
-        if ((requestCode == REQ_LOCATION || requestCode == REQ_BT) && granted) {
+        if ((requestCode == REQ_LOCATION || requestCode == REQ_BT || requestCode == REQ_MOTION) && granted) {
             Runnable next = afterPermission;
             afterPermission = null;
             if (next != null) next.run();
-        } else if ((requestCode == REQ_LOCATION || requestCode == REQ_BT) && !granted) {
+        } else if ((requestCode == REQ_LOCATION || requestCode == REQ_BT || requestCode == REQ_MOTION) && !granted) {
             afterPermission = null;
             error("Berechtigung nicht erteilt.");
         }

@@ -10,10 +10,10 @@
 
 ## Noch nicht originalgleich / nächster Ausbau
 - Echte interne Fußwegrouten-Berechnung und Sprachausgabe
-- Bewegungs-/Aktivitätserkennung als alternative Auto-Park-Methode (und kombinierte Erkennung)
+- Geräterealtests der neuen Bewegungs-/Aktivitätserkennung und Kombinationslogik
 - Originalgetreue Einstellungsseiten/Onboarding (Referenzscreenshots erforderlich)
 - Offlinekarten mit regelkonformem Kartenprovider
-- Weitere Widget-Größen, Wear OS, Parkhausmodus
+- Widget-Größen optimieren, Wear OS, Parkhausmodus
 - Geräterealtests auf HyperOS/Android 15, Akkuoptimierung, Berechtigungen und Rotation
 - Langfristig: Automatisierte UI-Tests, Datenexport/Import, mehrere Fahrzeuge, Kartenbibliothekswechsel
 

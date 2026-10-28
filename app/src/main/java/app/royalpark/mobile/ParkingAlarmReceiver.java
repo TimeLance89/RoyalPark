@@ -47,6 +47,7 @@ public final class ParkingAlarmReceiver extends BroadcastReceiver {
             NotificationManager manager = context.getSystemService(NotificationManager.class);
             if (manager != null) manager.notify(902, notification(context,
                     "Parkzeit läuft ab", "Dein Parkplatz-Timer ist abgelaufen.", false));
+            ParkingWidget.updateAll(context);
         }
     }
 }
