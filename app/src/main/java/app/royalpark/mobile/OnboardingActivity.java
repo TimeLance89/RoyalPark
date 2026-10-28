@@ -15,6 +15,7 @@ import android.view.View;
 import android.view.ViewGroup;
 import android.view.WindowInsets;
 import android.widget.FrameLayout;
+import android.widget.ImageView;
 import android.widget.LinearLayout;
 import android.widget.ScrollView;
 import android.widget.TextView;
@@ -184,19 +185,31 @@ public final class OnboardingActivity extends Activity {
         lp.topMargin = dp(4);
         content.addView(illustration, lp);
 
-        TextView map = label("  · · · · ·  ◦  · · · · ·  \n\n      ────────╮\n          🚘   ╰───  ●", 22,
-                0xFF89BAB7, true);
-        map.setGravity(Gravity.CENTER);
-        illustration.addView(map, new FrameLayout.LayoutParams(-1, -1));
-
-        TextView icon = label(page == 0 ? "⌖" : page == 1 ? "◎" : page == 2 ? "🚘" : "✓",
-                46, TEAL, true);
-        icon.setGravity(Gravity.CENTER);
-        icon.setElevation(dp(5));
-        icon.setBackground(bg(Color.WHITE, 28));
-        FrameLayout.LayoutParams ip = new FrameLayout.LayoutParams(dp(94), dp(94),
-                Gravity.CENTER);
-        illustration.addView(icon, ip);
+        View roadOne = new View(this);
+        roadOne.setBackground(bg(0xFFD1EBE9, 22));
+        roadOne.setRotation(-22f);
+        FrameLayout.LayoutParams roadParams = new FrameLayout.LayoutParams(
+                -1, dp(29), Gravity.CENTER);
+        illustration.addView(roadOne, roadParams);
+        View roadTwo = new View(this);
+        roadTwo.setBackground(bg(0xFFFFFFFF, 22));
+        roadTwo.setRotation(46f);
+        FrameLayout.LayoutParams secondRoad = new FrameLayout.LayoutParams(
+                -1, dp(17), Gravity.CENTER);
+        illustration.addView(roadTwo, secondRoad);
+        FrameLayout medallion = new FrameLayout(this);
+        medallion.setBackground(bg(Color.WHITE, 27));
+        medallion.setElevation(dp(5));
+        FrameLayout.LayoutParams center = new FrameLayout.LayoutParams(
+                dp(92), dp(92), Gravity.CENTER);
+        illustration.addView(medallion, center);
+        ImageView icon = new ImageView(this);
+        icon.setImageResource(R.drawable.ic_royalpark);
+        icon.setContentDescription("RoyalPark Parkplatz-Symbol");
+        icon.setScaleType(ImageView.ScaleType.FIT_CENTER);
+        FrameLayout.LayoutParams iconParams = new FrameLayout.LayoutParams(
+                dp(75), dp(75), Gravity.CENTER);
+        medallion.addView(icon, iconParams);
     }
     private void welcome() {
         benefit("Ohne Konto", "Alles bleibt lokal auf deinem Gerät.");
