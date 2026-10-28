@@ -36,3 +36,19 @@ Kein Fremdquellcode, keine fremden Grafiken, kein Lizenz-/Aboumgehungscode.
 - Offen: Ein-Klick-Download derselben Regionen für Vektorkarte **und** BRouter-Segmente innerhalb von RoyalPark
 - Offen: eigene native Offline-Routing-Engine ohne externe installierte App
 - Offen: echte Offline-Wegbeschreibungen mit Sprachausgabe, Device-Tests und dauerhafte APK-Signierung
+
+## 0.9.0 – umgesetzt
+- Intelligente Kameraposition für Auto, eigenen Standort und beide zusammen
+- Start direkt am geparkten Fahrzeug mit Nahzoom
+- Parkdauer, Luftlinienentfernung und Warnung bei ungenauem GPS
+- Noch offen: Realgerättests für Kamera, einheitliche Buttongrößen, andere Displayauflösungen
+
+## Weiterentwicklung – priorisiert
+1. Verlässliche Release-Signatur und Integrations-/Migrationstests, damit Daten bei Updates nicht gefährdet werden.
+2. Mehrere Fahrzeuge inklusive frei benannter Profile und individuellem Bluetooth-Pairing.
+3. Präzisere Ausstiegserkennung: Übergang Autofahrt → Fußweg und eine Bestätigungsphase, bevor die aktive Position ersetzt wird.
+4. Parkzonen/Wiederkehrende Orte, Parkscheinablauf, Parkverbots- und Straßenreinigungserinnerungen (vom Nutzer konfiguriert, keine erfundenen örtlichen Vorschriften).
+5. Parkhaus-Flow: Zufahrt, Ebene, Bereich, Foto, Offline-Speicherung, Standort-Genauigkeit sichtbar.
+6. Stabilere Offlinekarte einschließlich Download-Integritätsprüfung, Segmentverwaltung und besserer lokaler Routingintegration.
+7. Sichere Datenportabilität inklusive verschlüsselter Backups, optionaler selbst gehosteter Synchronisation.
+8. Barrierefreiheit und UI-Tests, Energiesparverhalten, reproduzierbare Release-Builds.

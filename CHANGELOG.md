@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.9.0 · 28. Oktober 2026
+- Smart Map: Startzoom 19 am aktuellen Parkplatz, eigene Aktionen für Ich/Auto/Beide
+- Zoom der eigenen Position an GPS-Genauigkeit angepasst
+- Intelligente Kartenbegrenzung für gleichzeitige Anzeige von Fahrer und Auto
+- Parkplatzkarte mit relativer Parkdauer und Luftlinienentfernung zum Fahrzeug
+- Warnung vor dem manuellen Speichern einer ungenauen GPS-Position (über 80 m)
+- MapFraming als eigenständig getestete Kameralogik, keine Datenbankschemaänderung
+- Datenschutztext auf tatsächliche Online-/Offline-Kartenfunktion angepasst
+
 ## 0.8.0 · 28. Oktober 2026
 - Direkter Download ausgewählter deutscher Offline-Vektorkarten aus dem Mapsforge-Hochschulmirror
 - Fortschrittsanzeige, Größenbegrenzung, Kartenheaderprüfung und lokale Speicherung

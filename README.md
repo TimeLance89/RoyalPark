@@ -1,4 +1,4 @@
-# RoyalPark · v0.8.0
+# RoyalPark · v0.9.0
 
 Eigenständige Android-Parkplatz-App. Hauptfunktionen: Parkplatz speichern, lokale Historie, Parkhausangaben, Fotos, ZIP-Backup, Parkuhr, Bluetooth-/Bewegungserkennung und Online-/Offline-Karten.
 
@@ -25,3 +25,15 @@ Eigenständige Android-Parkplatz-App. Hauptfunktionen: Parkplatz speichern, loka
 
 ## Entwicklungsumgebung
 Java 17, Gradle, Android SDK 35, osmdroid und osmdroid-mapsforge 6.1.20, Google Play Services für Aktivitätserkennung. GitHub Actions baut eine Debug-APK. Dauerhafte Release-Signierung und umfangreiche Geräterealtests sind noch offen.
+
+
+## 0.9.0: Smart Map / Parkplatz im Fokus
+- Karte öffnet bei aktivem Parkplatz direkt mit Nahzoom 19 statt 16.8.
+- Schwebende Befehle **Ich**, **Auto** und **Beide**: Der Standort-Button ist ein Fadenkreuz; Auto zoomt nah an den aktuellen Parkplatz; Beide passt die Ansicht an beide Marker an.
+- Im "Beide"-Modus passt sich der Kartenausschnitt an die tatsächliche Entfernung an; aus kurzer Distanz bleibt die Karte in einem sinnvollen Nahzoom statt wegzuzoomen.
+- Beim Fokussieren des eigenen Standorts variiert der Zoom nach GPS-Genauigkeit, damit eine ungenaue Netzposition nicht fälschlich punktgenau erscheint.
+- Die Parkplatzkarte zeigt neben der Speicherzeit eine relative Parkdauer und die aktuelle Entfernung zum Auto als **Luftlinie**. Der Entfernungshinweis ist anklickbar und öffnet die gemeinsame Ansicht.
+- Bei manuell gespeichertem Standort mit mehr als 80 Metern Ungenauigkeit erscheint eine Bestätigung mit erneuter Ortung oder bewusstem Speichern. Für präzisere Garagenangaben ist weiterhin die lange Kartenberührung verfügbar.
+- Die Funktion arbeitet bei installierten Offlinekarten genauso wie online. Die reine Kartenfokussierung fordert keine Routingabfrage an.
+- Es wurde keine Datenbankmigration benötigt; bestehende Parkplätze bleiben unverändert.
+- UI- und GPS-Gerätetests stehen weiterhin aus; GitHub-CI bestätigt nur Kompilierung und Unit-Tests.

@@ -25,6 +25,7 @@ import java.io.File;
 import java.io.IOException;
 import android.os.Build;
 import android.os.Bundle;
+import android.text.format.DateUtils;
 import android.provider.Settings;
 import android.view.Gravity;
 import android.view.View;
@@ -42,6 +43,7 @@ import android.widget.Toast;
 import org.osmdroid.config.Configuration;
 import org.osmdroid.tileprovider.tilesource.XYTileSource;
 import org.osmdroid.util.GeoPoint;
+import org.osmdroid.util.BoundingBox;
 import org.osmdroid.views.MapView;
 import org.osmdroid.views.overlay.Marker;
 
@@ -88,6 +90,7 @@ public final class MainActivity extends Activity {
     private LinearLayout headerView;
     private MapView map;
     private TextView locationStatus;
+    private TextView parkingDistanceLine;
     private ImageButton locationButton;
     private Marker myLocationMarker;
     private boolean locatingNow;
@@ -260,6 +263,7 @@ public final class MainActivity extends Activity {
             map = null;
         }
         body.removeAllViews();
+        parkingDistanceLine = null;
         headerView.setVisibility(tab == TAB_MAP ? View.GONE : View.VISIBLE);
         bottomBar.setVisibility(tab == TAB_MAP ? View.GONE : View.VISIBLE);
         if (tab == TAB_MAP) {
@@ -342,7 +346,14 @@ public final class MainActivity extends Activity {
                 new String[]{"https://tile.openstreetmap.org/"}));
         boolean offline = OfflineMaps.apply(this, map);
         map.setMultiTouchControls(true);
-        map.getController().setZoom(active != null || deviceLocation != null ? 16.8 : 5.5);
+        // The first map view focuses closely on the actual parked car, never on Germany.
+        if (deviceLocation == null && LocationGateway.hasPermission(this)) {
+            deviceLocation = LocationGateway.recent(this, 120_000L, 250f);
+        }
+        map.getController().setZoom(active != null ? MapFraming.CAR_ZOOM
+                : deviceLocation != null ? MapFraming.myPositionZoom(
+                        deviceLocation.hasAccuracy() ? deviceLocation.getAccuracy() : Float.NaN)
+                : 5.5);
         GeoPoint destination = active != null
                 ? new GeoPoint(active.latitude, active.longitude)
                 : deviceLocation != null
@@ -439,6 +450,9 @@ public final class MainActivity extends Activity {
             line(heading, "PARKPLATZ", 11, ACCENT_DARK, true, 0);
             line(heading, "Dein Auto steht hier", 21, WHITE, true, 5);
             line(heading, format(active.parkedAt), 12, MUTED, false, 5);
+            line(heading, "Geparkt " + DateUtils.getRelativeTimeSpanString(
+                    active.parkedAt, System.currentTimeMillis(), DateUtils.MINUTE_IN_MILLIS),
+                    12, MUTED, false, 5);
             headline.addView(heading, new LinearLayout.LayoutParams(0, -2, 1));
             TextView close = text("⋯", 28, MUTED, true);
             close.setGravity(Gravity.CENTER);
@@ -454,6 +468,10 @@ public final class MainActivity extends Activity {
                 line(sheet, "Standortgenauigkeit  ±" + Math.round(deviceLocation.getAccuracy()) + " m",
                         12, ACCENT_DARK, false, 9);
             }
+            parkingDistanceLine = text("Luftlinie zum Auto: Standort ermitteln", 13, ACCENT_DARK, true);
+            parkingDistanceLine.setOnClickListener(v -> focusBoth());
+            margin(sheet, parkingDistanceLine, 8);
+            updateParkingDistance();
             String garage = GarageLabels.summary(active.floor, active.space);
             if (!garage.isEmpty()) line(sheet, "Parkhaus: " + garage, 13, ACCENT_DARK, true, 7);
             if (!active.note.isEmpty()) line(sheet, active.note, 13, MUTED, false, 7);
@@ -482,17 +500,24 @@ public final class MainActivity extends Activity {
         locationButton.setBackground(shape(Color.WHITE, 25));
         locationButton.setElevation(dp(7));
         locationButton.setOnClickListener(v -> showMyLocation());
-        int locationBottom = active == null ? 247 : 304;
-        canvas.addView(locationButton, floatingAt(51, 51, Gravity.RIGHT | Gravity.BOTTOM,
-                0, 0, 18, locationBottom));
+        // Explicit camera controls remain accessible above the parking bottom sheet.
+        canvas.addView(locationButton, floatingAt(51, 51, Gravity.TOP | Gravity.RIGHT,
+                0, 78, 17, 0));
+        TextView focusCar = floatingButton("AUTO", 12, this::focusParked);
+        focusCar.setContentDescription("Nah an meinen geparkten Wagen zoomen");
+        canvas.addView(focusCar, floatingAt(54, 49, Gravity.TOP | Gravity.RIGHT, 0, 138, 17, 0));
+        TextView focusBoth = floatingButton("BEIDE", 12, this::focusBoth);
+        focusBoth.setContentDescription("Auto und meinen Standort zusammen anzeigen");
+        canvas.addView(focusBoth, floatingAt(54, 49, Gravity.TOP | Gravity.RIGHT, 0, 197, 17, 0));
+
         locationStatus = text("", 12, WHITE, true);
         locationStatus.setGravity(Gravity.CENTER);
         locationStatus.setPadding(dp(10), dp(4), dp(10), dp(4));
         locationStatus.setBackground(shape(Color.WHITE, 10));
         locationStatus.setElevation(dp(4));
         locationStatus.setVisibility(View.GONE);
-        canvas.addView(locationStatus, floatingAt(164, 31, Gravity.RIGHT | Gravity.BOTTOM,
-                0, 0, 80, locationBottom + 9));
+        canvas.addView(locationStatus, floatingAt(164, 31, Gravity.TOP | Gravity.RIGHT,
+                0, 88, 77, 0));
 
         // Provider attribution must remain accessible above the floating sheet.
         TextView attribution = text("© OpenStreetMap-Mitwirkende", 11, WHITE, false);
@@ -671,7 +696,7 @@ public final class MainActivity extends Activity {
         LinearLayout privacy = card();
         line(privacy, "DATENSCHUTZ", 12, ACCENT, true, 0);
         line(privacy, "Kein Konto. Kein Tracking. Keine Werbung.", 17, WHITE, true, 7);
-        line(privacy, "Deine Parkplatzdaten bleiben in der lokalen SQLite-Datenbank. Für Kartenausschnitte werden Kacheln von OpenStreetMap geladen. Bei Auswahl einer Straßenroute wird eine externe Karten-App geöffnet.",
+        line(privacy, "Parkplätze werden lokal gespeichert. Online-Karten und optionale Valhalla-Fußwegrouten rufen externe Dienste auf. Installierte Offlinekarten sowie BRouter-Routen lassen sich ohne Netz nutzen.",
                 14, MUTED, false, 8);
         actionLine(privacy, "Benachrichtigungen erlauben", false, this::askNotifications);
         actionLine(privacy, "App-Berechtigungen öffnen", false, () -> {
@@ -680,7 +705,7 @@ public final class MainActivity extends Activity {
             startActivity(intent);
         });
         margin(content, privacy, 16);
-        line(content, "ROYALPARK 0.8.0  ·  Eigenständiger Neubau", 12, MUTED, false, 25);
+        line(content, "ROYALPARK 0.9.0  ·  Eigenständiger Neubau", 12, MUTED, false, 25);
     }
 
     private void ensureLocation(Runnable action) {
@@ -696,16 +721,33 @@ public final class MainActivity extends Activity {
         ensureLocation(() -> {
             toast("Standort wird ermittelt …");
             LocationGateway.once(this, (location, error) -> {
+                if (isFinishing() || isDestroyed()) return;
                 if (location == null) { error(error); return; }
-                ParkingSpot spot = store.save(location.getLatitude(), location.getLongitude(), "", "MANUAL");
-                AlarmScheduler.cancel(this);
-                ParkingWidget.updateAll(this);
-                deviceLocation = location;
-                toast("Parkplatz gespeichert");
-                showTab(TAB_MAP);
-                editNote(spot);
+                // GPS in a garage may be imprecise. The user must confirm an uncertain location.
+                if (!location.hasAccuracy() || location.getAccuracy() > 80f) {
+                    new AlertDialog.Builder(this)
+                            .setTitle("Standort noch ungenau")
+                            .setMessage("Die gemeldete Genauigkeit beträgt " + (
+                                    location.hasAccuracy() ? "±" + Math.round(location.getAccuracy()) + " Meter"
+                                            : "unbekannt") +
+                                    ". Soll der Parkplatz trotzdem hier gespeichert werden? Du kannst die Stelle auch durch langes Tippen auf die Karte genau markieren.")
+                            .setNegativeButton("Abbrechen", null)
+                            .setNeutralButton("Erneut orten", (dialog, choice) -> saveCurrent())
+                            .setPositiveButton("Trotzdem speichern", (dialog, choice) -> persistParking(location))
+                            .show();
+                } else persistParking(location);
             });
         });
+    }
+
+    private void persistParking(Location location) {
+        ParkingSpot spot = store.save(location.getLatitude(), location.getLongitude(), "", "MANUAL");
+        AlarmScheduler.cancel(this);
+        ParkingWidget.updateAll(this);
+        deviceLocation = location;
+        toast("Parkplatz gespeichert");
+        showTab(TAB_MAP);
+        editNote(spot);
     }
 
     private void showMyLocation() {
@@ -744,20 +786,113 @@ public final class MainActivity extends Activity {
     }
 
     private void jumpToLocation(Location location, boolean animate) {
-        deviceLocation = location;
+        updateMyMarker(location);
         if (map == null || currentTab != TAB_MAP) return;
         GeoPoint point = new GeoPoint(location.getLatitude(), location.getLongitude());
+        map.getController().setZoom(MapFraming.myPositionZoom(
+                location.hasAccuracy() ? location.getAccuracy() : Float.NaN));
+        if (animate) map.getController().animateTo(point);
+        else map.getController().setCenter(point);
+        map.invalidate();
+    }
+
+    private void updateMyMarker(Location location) {
+        if (location == null) return;
+        deviceLocation = location;
+        updateParkingDistance();
+        if (map == null || currentTab != TAB_MAP) return;
         if (myLocationMarker == null) {
             myLocationMarker = new Marker(map);
             myLocationMarker.setTitle("Mein Standort");
             myLocationMarker.setAnchor(Marker.ANCHOR_CENTER, Marker.ANCHOR_BOTTOM);
         }
-        myLocationMarker.setPosition(point);
-        if (!map.getOverlays().contains(myLocationMarker)) map.getOverlays().add(myLocationMarker);
-        map.getController().setZoom(17.0);
-        if (animate) map.getController().animateTo(point);
-        else map.getController().setCenter(point);
+        myLocationMarker.setPosition(new GeoPoint(location.getLatitude(), location.getLongitude()));
+        if (!map.getOverlays().contains(myLocationMarker))
+            map.getOverlays().add(myLocationMarker);
         map.invalidate();
+    }
+
+    private void updateParkingDistance() {
+        if (parkingDistanceLine == null) return;
+        ParkingSpot spot = store == null ? null : store.active();
+        if (spot == null || deviceLocation == null) {
+            parkingDistanceLine.setText("⌖  Entfernung zum Auto anzeigen");
+            return;
+        }
+        long ageMs = (android.os.SystemClock.elapsedRealtimeNanos()
+                - deviceLocation.getElapsedRealtimeNanos()) / 1_000_000L;
+        if (ageMs < 0 || ageMs > 120_000L) {
+            parkingDistanceLine.setText("⌖  Standort aktualisieren, um die Entfernung zu sehen");
+            return;
+        }
+        double meters = NavigationMath.distanceMeters(
+                spot.latitude, spot.longitude,
+                deviceLocation.getLatitude(), deviceLocation.getLongitude());
+        parkingDistanceLine.setText("⌖  " + NavigationMath.formatDistance(meters)
+                + " Luftlinie zum Auto · beide anzeigen");
+    }
+
+    private void focusParked() {
+        ParkingSpot spot = store.active();
+        if (spot == null) {
+            toast("Noch kein Parkplatz gespeichert.");
+            return;
+        }
+        if (currentTab != TAB_MAP) {
+            showTab(TAB_MAP);
+        }
+        if (map == null) return;
+        map.getController().setZoom(MapFraming.CAR_ZOOM);
+        map.getController().animateTo(new GeoPoint(spot.latitude, spot.longitude));
+        setLocationStatus("Parkplatz im Fokus");
+    }
+
+    private void focusBoth() {
+        ParkingSpot spot = store.active();
+        if (spot == null) {
+            showMyLocation();
+            return;
+        }
+        ensureLocation(() -> {
+            Location recent = LocationGateway.recent(this, 120_000L, 250f);
+            if (recent != null) {
+                focusBothWith(spot, recent);
+                return;
+            }
+            setLocationStatus("Ermittle deinen Standort …");
+            LocationGateway.once(this, (location, error) -> {
+                if (isFinishing() || isDestroyed()) return;
+                if (location == null) { error(error); return; }
+                focusBothWith(spot, location);
+            });
+        });
+    }
+
+    private void focusBothWith(ParkingSpot spot, Location location) {
+        if (currentTab != TAB_MAP) showTab(TAB_MAP);
+        updateMyMarker(location);
+        if (map == null) return;
+        MapView currentMap = map;
+        GeoPoint parked = new GeoPoint(spot.latitude, spot.longitude);
+        GeoPoint here = new GeoPoint(location.getLatitude(), location.getLongitude());
+        if (MapFraming.nearby(spot.latitude, spot.longitude,
+                location.getLatitude(), location.getLongitude())) {
+            currentMap.getController().setZoom(MapFraming.MAX_BOTH_ZOOM);
+            currentMap.getController().animateTo(parked);
+        } else {
+            MapFraming.Frame bounds = MapFraming.aroundBoth(
+                    spot.latitude, spot.longitude, location.getLatitude(), location.getLongitude());
+            currentMap.post(() -> {
+                if (currentTab == TAB_MAP && map == currentMap) {
+                    currentMap.zoomToBoundingBox(new BoundingBox(
+                            bounds.north, bounds.east, bounds.south, bounds.west),
+                            true, dp(72), MapFraming.MAX_BOTH_ZOOM, 450L);
+                }
+            });
+        }
+        double meters = NavigationMath.distanceMeters(
+                spot.latitude, spot.longitude, here.getLatitude(), here.getLongitude());
+        setLocationStatus("Auto: " + NavigationMath.formatDistance(meters));
     }
 
     private void setLocationStatus(String message) {
