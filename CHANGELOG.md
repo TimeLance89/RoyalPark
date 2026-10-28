@@ -1,5 +1,12 @@
 # Changelog
 
+## 1.2.2 · 28. Oktober 2026
+- Der aktive Parkplatz kann direkt unter „Weitere Aktionen“ gelöscht werden, ohne erst den Verlauf zu öffnen.
+- Löschaktion ist dezent rot und benötigt eine ausdrückliche Bestätigung.
+- Bei Löschung eines aktiven Parkplatzes wird dessen Parkuhr beendet, die Widget-Anzeige aktualisiert und die Karte auf „Kein Parkplatz gespeichert“ zurückgesetzt.
+- Die gleiche abgesicherte Löschfunktion steht im Drei-Punkte-Menü und im Verlauf zur Verfügung.
+- Andere Parkplatz-Einträge bleiben unangetastet. Keine Datenbankmigration.
+
 ## 1.2.1 · 28. Oktober 2026
 - Kartenquellenangabe von OpenStreetMap bleibt sichtbar und führt zur Lizenzseite, überdeckt aber nicht mehr den Text der Parkplatzkarte.
 - Quellenangabe folgt dynamisch der tatsächlichen Höhe des Parkplatzfensters (eingeklappt, aufgeklappt, bei anderer Schriftgröße).

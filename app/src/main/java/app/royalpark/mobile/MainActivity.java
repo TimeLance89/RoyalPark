@@ -597,8 +597,19 @@ public final class MainActivity extends Activity {
             margin(extras, shortcuts, 4);
             TextView moreOptions = text("Parkhaus · Teilen · Verlauf  →", 13, ACCENT_DARK, true);
             moreOptions.setGravity(Gravity.CENTER);
+            moreOptions.setMinHeight(dp(44));
+            moreOptions.setContentDescription("Weitere Optionen zu diesem Parkplatz");
             moreOptions.setOnClickListener(v -> showParkingMore(active));
-            margin(extras, moreOptions, 10);
+            margin(extras, moreOptions, 6);
+
+            // Deletion is intentionally visible in the expanded details, not hidden
+            // in a second dialog behind the overflow menu. Confirmation is required.
+            TextView deleteSpot = text("⌫  Parkplatz löschen", 13, Color.rgb(173, 57, 63), true);
+            deleteSpot.setGravity(Gravity.CENTER);
+            deleteSpot.setMinHeight(dp(44));
+            deleteSpot.setContentDescription("Gespeicherten Parkplatz dauerhaft löschen");
+            deleteSpot.setOnClickListener(v -> confirmDeleteParking(active, TAB_MAP));
+            margin(extras, deleteSpot, 2);
             extras.setVisibility(parkingDetailsExpanded ? View.VISIBLE : View.GONE);
             TextView expand = text(parkingDetailsExpanded ? "Weniger anzeigen  ⌃"
                     : "Weitere Aktionen  ⌄", 13, ACCENT_DARK, true);
@@ -669,16 +680,59 @@ public final class MainActivity extends Activity {
                         "Parkhausangaben bearbeiten",
                         "Foto verwalten",
                         "Standort teilen",
-                        "Parkverlauf öffnen"
+                        "Parkverlauf öffnen",
+                        "Parkplatz löschen"
                 }, (dialog, which) -> {
                     switch (which) {
                         case 0: saveCurrent(); break;
                         case 1: editGarage(spot); break;
                         case 2: photo(spot); break;
                         case 3: share(spot); break;
-                        default: showTab(TAB_HISTORY); break;
+                        case 4: showTab(TAB_HISTORY); break;
+                        case 5: confirmDeleteParking(spot, TAB_MAP); break;
                     }
                 }).show();
+    }
+
+    private void confirmDeleteParking(ParkingSpot selected, int nextTab) {
+        if (selected == null || store.getById(selected.id) == null) {
+            toast("Dieser Parkplatz ist bereits gelöscht.");
+            showTab(nextTab);
+            return;
+        }
+        ParkingSpot current = store.active();
+        boolean isCurrent = current != null && current.id == selected.id;
+        AlertDialog dialog = new AlertDialog.Builder(this)
+                .setTitle("Parkplatz löschen?")
+                .setMessage(isCurrent
+                        ? "Dieser Parkplatz wird dauerhaft aus deiner Liste entfernt. "
+                                + "Eine laufende Parkuhr wird beendet. "
+                                + "Andere gespeicherte Parkplätze bleiben erhalten."
+                        : "Dieser Parkplatz wird dauerhaft aus deinem Verlauf entfernt. "
+                                + "Andere gespeicherte Parkplätze bleiben erhalten.")
+                .setNegativeButton("Abbrechen", null)
+                .setPositiveButton("Löschen", (d, which) -> {
+                    // Check again at confirmation: automation can change the active spot.
+                    ParkingSpot latest = store.getById(selected.id);
+                    if (latest == null) {
+                        toast("Parkplatz ist bereits gelöscht.");
+                        showTab(nextTab);
+                        return;
+                    }
+                    ParkingSpot activeNow = store.active();
+                    if (activeNow != null && activeNow.id == selected.id)
+                        AlarmScheduler.cancel(this);
+                    store.delete(selected.id);
+                    ParkingWidget.updateAll(this);
+                    parkingDetailsExpanded = false;
+                    showTab(nextTab);
+                    toast("Parkplatz gelöscht");
+                })
+                .create();
+        dialog.setOnShowListener(ignored ->
+                dialog.getButton(AlertDialog.BUTTON_POSITIVE)
+                        .setTextColor(Color.rgb(173, 57, 63)));
+        dialog.show();
     }
 
     private void showInitialPosition() {
@@ -756,16 +810,7 @@ public final class MainActivity extends Activity {
                         case 2: photo(spot); break;
                         case 3: share(spot); break;
                         case 4:
-                            new AlertDialog.Builder(this)
-                                    .setTitle("Parkplatz löschen?")
-                                    .setMessage("Dieser Eintrag wird aus deinem Verlauf entfernt.")
-                                    .setNegativeButton("Abbrechen", null)
-                                    .setPositiveButton("Löschen", (d, choice) -> {
-                                        if (current) AlarmScheduler.cancel(this);
-                                        store.delete(spot.id);
-                                        ParkingWidget.updateAll(this);
-                                        showTab(TAB_HISTORY);
-                                    }).show();
+                            confirmDeleteParking(spot, TAB_HISTORY);
                             break;
                     }
                 }).show();
