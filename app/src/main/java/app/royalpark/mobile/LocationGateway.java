@@ -19,6 +19,11 @@ public final class LocationGateway {
     public interface Callback { void onResult(Location location, String error); }
     private LocationGateway() {}
 
+    public static boolean hasPrecisePermission(Context context) {
+        return context.checkSelfPermission(Manifest.permission.ACCESS_FINE_LOCATION)
+                == PackageManager.PERMISSION_GRANTED;
+    }
+
     public static boolean hasPermission(Context context) {
         return context.checkSelfPermission(Manifest.permission.ACCESS_FINE_LOCATION) == PackageManager.PERMISSION_GRANTED
                 || context.checkSelfPermission(Manifest.permission.ACCESS_COARSE_LOCATION) == PackageManager.PERMISSION_GRANTED;

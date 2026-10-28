@@ -1,4 +1,4 @@
-# RoyalPark · v1.0.0
+# RoyalPark · v1.0.1
 
 Eigenständige Android-Parkplatz-App. Hauptfunktionen: Parkplatz speichern, lokale Historie, Parkhausangaben, Fotos, ZIP-Backup, Parkuhr, Bluetooth-/Bewegungserkennung und Online-/Offline-Karten.
 
@@ -44,3 +44,10 @@ Java 17, Gradle, Android SDK 35, osmdroid und osmdroid-mapsforge 6.1.20, Google 
 - Vier geschützte Actions-Secrets statt Schlüsseldaten im öffentlichen Repository.
 - Alte Debug-Versionen können **nicht** über die neue Release-Version aktualisiert werden (Backup/Neuinstallation nötig).
 - Anleitung: [`docs/RELEASE_SIGNING.md`](docs/RELEASE_SIGNING.md).
+
+## Standortbedienung seit 1.0.1
+- Die Schaltfläche »Parkplatz speichern« legt die Position ohne modalen Genauigkeits-Warndialog ab.
+- Wenn Android nur ungefähre Ortung erlaubt oder die gemeldete Genauigkeit über 80 Metern liegt, kennzeichnet RoyalPark die gespeicherte Parkposition sichtbar als **ungefähr**. Die App behauptet keine Präzision, die sie nicht hat.
+- Auf dem Hauptbildschirm kann man freiwillig die Standortberechtigungen der App öffnen und »Genauen Standort verwenden« einschalten.
+- Der alternative Weg bleibt: Langes Tippen auf der Karte setzt die Position manuell. Notizen sind optional und werden nicht automatisch eingefordert.
+- Wenn präzise Standortfreigabe deaktiviert ist, lässt Android selbst nicht zu, dass RoyalPark diese Einschränkung umgeht. Die Wahl bleibt jederzeit beim Nutzer.

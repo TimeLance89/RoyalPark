@@ -372,7 +372,7 @@ public final class MainActivity extends Activity {
                             AlarmScheduler.cancel(MainActivity.this);
                             ParkingWidget.updateAll(MainActivity.this);
                             showTab(TAB_MAP);
-                            editNote(spot);
+                            toast("Parkplatz gespeichert · Notiz optional über die Parkplatzkarte.");
                         }).show();
                 return true;
             }

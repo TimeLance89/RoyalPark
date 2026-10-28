@@ -1,5 +1,14 @@
 # Changelog
 
+## 1.0.1 · 28. Oktober 2026
+- Kein automatisch aufspringender Genauigkeits-Dialog beim Parkplatzspeichern mehr.
+- Kein erzwungener Notiz-Dialog nach dem Speichern, auch nicht nach manueller Kartenmarkierung.
+- Ungenaue gespeicherte Parkplatzpositionen werden nachvollziehbar mit MANUAL_APPROX gekennzeichnet.
+- Nicht blockierender Hinweis auf der Parkplatzkarte, inklusive freiwilligem Link zur Android-Standortfreigabe.
+- GPS-Kennzeichnung verbessert: "Ungefährer Standort" bei nur grober Android-Berechtigung.
+- Keine Datenbankmigration; VersionCode 11 für Update derselben signierten Release-App.
+- Unit-Tests für die Standort-Genauigkeitsklassifizierung.
+
 ## 1.0.0 · 28. Oktober 2026
 - Erste reguläre Release-Linie mit eigenem dauerhaften Android-Signaturschlüssel
 - Sicherer GitHub-Actions-Workflow für signierte APKs, inkl. Signaturprüfung
