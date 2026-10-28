@@ -59,3 +59,10 @@ Kein Fremdquellcode, keine fremden Grafiken, kein Lizenz-/Aboumgehungscode.
 - Offline-Regionenauswahl auf Xiaomi repariert (setMessage verdeckte setItems).
 - Entfernung mit GPS-Unsicherheit und natürliche Parkdauer in einer getesteten Präsentationslogik.
 - Offen: UI-Tests auf kleinen Displays, Bildschirmrotation und größere Schrift; Betrieb ohne Netzwerk.
+
+## 1.3.0 – Kartenleistung
+- Erledigt: MapView/Offline-Provider über Tabwechsel und Activity-Resume weiterverwenden.
+- Erledigt: Kachelcache RAM 9→64, Overshoot=1, Animationen verkürzt, unnötige GPS-Zoomwechsel vermeiden.
+- Erledigt: Kompassberechnung gedrosselt, Magnetausgleich wiederverwenden.
+- Offen: Frame-Metriken auf realen Telefonen, große Offline-Vektorkarten benchmarken, gezielter Kartenrenderer-Vergleich.
+- Offen: eventuell performantere Vektor-Engine evaluieren. Kein Wechsel ohne Android-Gerätevergleich.

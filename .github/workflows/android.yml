@@ -38,6 +38,6 @@ jobs:
       - name: Upload installable APK
         uses: actions/upload-artifact@v4
         with:
-          name: RoyalPark-v1.2.2-debug
+          name: RoyalPark-v1.3.0-debug
           path: app/build/outputs/apk/debug/app-debug.apk
           if-no-files-found: error

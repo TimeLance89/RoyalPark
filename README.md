@@ -38,3 +38,16 @@ Die reale Kontrolle auf Android/HyperOS, inklusive kleiner Displays, gedrehter A
 - **Offline-Regionen:** Die Regionsliste erscheint wieder vollständig: Der Android-AlertDialog darf hierfür nicht gleichzeitig setMessage() und setItems() verwenden.
 - **Kompatibilität:** Kein neues Datenbankschema, VersionCode 13. Die reguläre signierte Release-Linie bleibt bestehen.
 - Android-/HyperOS-UI-Gerätetests und Download-Tests für konkrete Mapsforge-Regionen stehen noch aus.
+
+
+## RoyalPark 1.3.0: Karten-Performance
+Die wichtigste Veränderung ist der Lebenszyklus der Karte:
+- Früher erzeugte jeder Tab-Wechsel und jedes Zurückkehren in die App einen neuen MapView samt Kachelanbieter. Insbesondere Mapsforge-Vektorkarten mussten jedes Mal ihre Ressourcen neu öffnen und gerenderte Kacheln gingen aus dem Arbeitsspeicher verloren.
+- Nun bleibt der MapView unsichtbar aber **angeschlossen** im Bildschirm, solange Verlauf/Einstellungen angezeigt werden. Bei Rückkehr wird derselbe MapView samt Tileprovider reaktiviert. Nur bei Änderung von Kartenquelle, Parkplatzdaten oder Standortberechtigung wird neu aufgebaut.
+- Der Kartenzoom und die Kamera bleiben bei Änderungen an *demselben* Parkplatz erhalten, statt automatisch zu springen.
+- Globaler osmdroid-RAM-Cache: **64** Tiles statt Standard **9** (bis ca. 16 MiB für 256px-ARGB-Bitmaps; tatsächlicher Bedarf hängt vom Format ab), eine Tile-Ring-Erweiterung beim Schwenken. Disk-Kartencache bleibt bestehen.
+- Standardanimationen auf **380 ms** und kurze Animationen auf **220 ms** reduziert; wiederholte Zoomänderungen unter 0,15 Zoomstufen vermieden.
+- Online-Karten werden **nicht** in größeren Mengen vom OSM-Server angefragt, die Downloadparallelität bleibt unverändert. Offline-Karten verwenden bestehende regionale Mapsforge-Dateien oder importierte Rasterarchive.
+- Die Navigation verwendet denselben Cache. Rotationssensor-Aktualisierung max. ca. **12,5 Hz** und magnetische Deklination max. einmal pro Minute, statt bei jedem Sensorereignis neu zu berechnen.
+- Keine weiteren Berechtigungen, keine Datenübertragung durch die Optimierung, keine Datenbankmigration.
+- **Prüfen:** Auf einem echten Xiaomi/HyperOS-Gerät müssen Scroll-Framerate, Kartengröße und Speicherauslastung getestet werden. Ein CI-Build misst keine tatsächliche 60-FPS-Leistung. Neue Regionen müssen vor dem ersten flüssigen Schwenken teilweise neu gerendert werden.

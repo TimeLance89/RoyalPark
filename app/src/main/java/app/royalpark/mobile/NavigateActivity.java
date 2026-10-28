@@ -17,6 +17,7 @@ import android.location.LocationListener;
 import android.location.LocationManager;
 import android.net.Uri;
 import android.os.Bundle;
+import android.os.SystemClock;
 import android.speech.tts.TextToSpeech;
 import android.view.Gravity;
 import android.view.View;
@@ -82,6 +83,9 @@ public final class NavigateActivity extends Activity
     private int routeProgressIndex;
     private int lastSpokenStep = -1;
     private long lastRequestMs;
+    private long lastCompassFrameMs;
+    private long declinationCheckedMs;
+    private float cachedMagneticDeclination;
 
     private int dp(int n) { return Math.round(getResources().getDisplayMetrics().density * n); }
 
@@ -115,8 +119,7 @@ public final class NavigateActivity extends Activity
         getWindow().setNavigationBarColor(BG);
         getWindow().getDecorView().setSystemUiVisibility(
                 View.SYSTEM_UI_FLAG_LIGHT_STATUS_BAR | View.SYSTEM_UI_FLAG_LIGHT_NAVIGATION_BAR);
-        Configuration.getInstance().load(this, getPreferences(MODE_PRIVATE));
-        Configuration.getInstance().setUserAgentValue("RoyalPark/0.5 (app.royalpark.mobile)");
+        MapPerformance.configure(this, getPreferences(MODE_PRIVATE));
 
         LinearLayout root = new LinearLayout(this);
         root.setBackgroundColor(BG);
@@ -410,16 +413,23 @@ public final class NavigateActivity extends Activity
 
     @Override public void onSensorChanged(SensorEvent event) {
         if (event.sensor.getType() != Sensor.TYPE_ROTATION_VECTOR) return;
+        // Compass rendering at ~12 fps is smooth while avoiding hundreds of
+        // matrix conversions and TextView rotations per second on mid-range phones.
+        long now = SystemClock.elapsedRealtime();
+        if (now - lastCompassFrameMs < 80L) return;
+        lastCompassFrameMs = now;
         float[] matrix = new float[9], orientation = new float[3];
         SensorManager.getRotationMatrixFromVector(matrix, event.values);
         SensorManager.getOrientation(matrix, orientation);
-        heading = (float) Math.toDegrees(orientation[0]);
-        if (current != null) {
+        if (current != null && (declinationCheckedMs == 0
+                || now - declinationCheckedMs > 60_000L)) {
             GeomagneticField magnetic = new GeomagneticField(
                     (float) current.getLatitude(), (float) current.getLongitude(),
                     (float) current.getAltitude(), System.currentTimeMillis());
-            heading += magnetic.getDeclination();
+            cachedMagneticDeclination = magnetic.getDeclination();
+            declinationCheckedMs = now;
         }
+        heading = (float) Math.toDegrees(orientation[0]) + cachedMagneticDeclination;
         updateArrow();
     }
 

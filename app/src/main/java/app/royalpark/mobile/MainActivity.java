@@ -89,6 +89,10 @@ public final class MainActivity extends Activity {
     private LinearLayout bottomBar;
     private LinearLayout headerView;
     private MapView map;
+    private FrameLayout mapScreen;
+    private View subPage;
+    private String lastMapRenderKey;
+    private long lastDisplayedParkingId = -1;
     private TextView locationStatus;
     private TextView parkingDistanceLine;
     private ImageButton locationButton;
@@ -120,8 +124,7 @@ public final class MainActivity extends Activity {
         }
         prefs = getSharedPreferences("royalpark", MODE_PRIVATE);
         // No tracking SDK and no analytics. Map tiles are fetched only for visible viewport.
-        Configuration.getInstance().load(this, getPreferences(MODE_PRIVATE));
-        Configuration.getInstance().setUserAgentValue("RoyalPark/0.1 (app.royalpark.mobile)");
+        MapPerformance.configure(this, getPreferences(MODE_PRIVATE));
         ParkingAlarmReceiver.createChannel(this);
         mainRoot = new LinearLayout(this);
         mainRoot.setOrientation(LinearLayout.VERTICAL);
@@ -271,20 +274,63 @@ public final class MainActivity extends Activity {
         mainRoot.addView(headerView);
     }
 
+    /**
+     * Keep the map view and provider alive while changing tabs. Previously every
+     * onResume() and every tab change destroyed the entire map, discarding its
+     * in-memory tile cache and re-opening the Mapsforge rendering pipeline.
+     */
     private void showTab(int tab) {
         currentTab = tab;
-        if (map != null) {
-            map.onPause();
-            map.onDetach();
-            map = null;
-        }
-        body.removeAllViews();
-        parkingDistanceLine = null;
-        headerView.setVisibility(tab == TAB_MAP ? View.GONE : View.VISIBLE);
-        bottomBar.setVisibility(tab == TAB_MAP ? View.GONE : View.VISIBLE);
-        if (tab == TAB_MAP) {
+        boolean showMap = tab == TAB_MAP;
+        headerView.setVisibility(showMap ? View.GONE : View.VISIBLE);
+        bottomBar.setVisibility(showMap ? View.GONE : View.VISIBLE);
+        if (showMap) {
+            if (subPage != null) {
+                body.removeView(subPage);
+                subPage = null;
+            }
+            String key = mapRenderKey();
+            ParkingSpot active = store.active();
+            long spotId = active == null ? -1 : active.id;
+            if (map != null && mapScreen != null && key.equals(lastMapRenderKey)) {
+                mapScreen.setVisibility(View.VISIBLE);
+                map.onResume();
+                return;
+            }
+            // Rebuild only when the stored parking or the map data source
+            // actually changed. Preserve camera position when editing a spot.
+            GeoPoint previousCenter = null;
+            double previousZoom = 0;
+            if (map != null && spotId == lastDisplayedParkingId
+                    && map.getMapCenter() != null) {
+                previousCenter = new GeoPoint(map.getMapCenter().getLatitude(), map.getMapCenter().getLongitude());
+                previousZoom = map.getZoomLevelDouble();
+            }
+            if (map != null) {
+                map.onPause();
+                map.onDetach();
+                map = null;
+            }
+            body.removeAllViews();
+            mapScreen = null;
+            parkingDistanceLine = null;
             showFullMap();
+            if (map != null && previousCenter != null) {
+                map.getController().setZoom(previousZoom);
+                map.getController().setCenter(previousCenter);
+            }
+            lastMapRenderKey = key;
+            lastDisplayedParkingId = spotId;
+            if (map != null) map.onResume();
             return;
+        }
+        if (mapScreen != null && map != null) {
+            mapScreen.setVisibility(View.GONE);
+            map.onPause();
+        }
+        if (subPage != null) {
+            body.removeView(subPage);
+            subPage = null;
         }
         ScrollView scroll = new ScrollView(this);
         scroll.setFillViewport(true);
@@ -293,12 +339,26 @@ public final class MainActivity extends Activity {
         content.setPadding(dp(16), dp(8), dp(16), dp(26));
         scroll.addView(content);
         body.addView(scroll, new FrameLayout.LayoutParams(-1, -1));
+        subPage = scroll;
         if (tab == TAB_HISTORY) showHistory(content);
         else showSettings(content);
         bottomBar.removeAllViews();
         nav("⌖", "Karte", TAB_MAP);
         nav("◷", "Verlauf", TAB_HISTORY);
         nav("⚙", "Mehr", TAB_SETTINGS);
+    }
+
+    private String mapRenderKey() {
+        ParkingSpot active = store.active();
+        String region = RegionMaps.current(this) == null ? ""
+                : RegionMaps.current(this).code;
+        String providerState = region + "|" + RegionMaps.enabled(this)
+                + "|" + RegionMaps.offline(this)
+                + "|" + OfflineMaps.enabled(this)
+                + "|" + OfflineMaps.hasArchive(this)
+                + "|" + OfflineMaps.sourceName(this);
+        return MapPerformance.renderKey(active, providerState,
+                LocationGateway.hasPrecisePermission(this));
     }
 
     private void nav(String symbol, String label, int tab) {
@@ -355,6 +415,7 @@ public final class MainActivity extends Activity {
         ParkingSpot active = store.active();
         FrameLayout canvas = new FrameLayout(this);
         canvas.setBackgroundColor(BG);
+        mapScreen = canvas;
         body.addView(canvas, new FrameLayout.LayoutParams(-1, -1));
 
         map = new MapView(this);
@@ -362,6 +423,7 @@ public final class MainActivity extends Activity {
                 new String[]{"https://tile.openstreetmap.org/"}));
         boolean offline = OfflineMaps.apply(this, map);
         map.setMultiTouchControls(true);
+        map.setFlingEnabled(true);
         // The first map view focuses closely on the actual parked car, never on Germany.
         if (deviceLocation == null && LocationGateway.hasPermission(this)) {
             deviceLocation = LocationGateway.recent(this, 120_000L, 250f);
@@ -1031,8 +1093,11 @@ public final class MainActivity extends Activity {
         updateMyMarker(location);
         if (map == null || currentTab != TAB_MAP) return;
         GeoPoint point = new GeoPoint(location.getLatitude(), location.getLongitude());
-        map.getController().setZoom(MapFraming.myPositionZoom(
-                location.hasAccuracy() ? location.getAccuracy() : Float.NaN));
+        double targetZoom = MapFraming.myPositionZoom(
+                location.hasAccuracy() ? location.getAccuracy() : Float.NaN);
+        // Avoid re-decoding the entire new zoom level on every GPS refresh.
+        if (MapPerformance.shouldZoom(map.getZoomLevelDouble(), targetZoom))
+            map.getController().setZoom(targetZoom);
         if (animate) map.getController().animateTo(point);
         else map.getController().setCenter(point);
         map.invalidate();
@@ -1704,8 +1769,11 @@ public final class MainActivity extends Activity {
 
     @Override protected void onResume() {
         super.onResume();
-        if (map != null) map.onResume();
-        if (body != null && store != null) showTab(currentTab);
+        if (body != null && store != null) {
+            // showTab() reuses the existing MapView on the map tab and refreshes
+            // just the selected non-map page when returning from Android settings.
+            showTab(currentTab);
+        }
     }
 
     @Override protected void onPause() {
@@ -1719,6 +1787,8 @@ public final class MainActivity extends Activity {
             map.onDetach();
             map = null;
         }
+        mapScreen = null;
+        subPage = null;
         if (store != null) store.close();
         super.onDestroy();
     }

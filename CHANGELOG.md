@@ -1,5 +1,16 @@
 # Changelog
 
+## 1.3.0 · 28. Oktober 2026
+- Karte und Kachelanbieter bleiben beim Wechsel zwischen Karte, Verlauf und Einstellungen erhalten – keine komplette Initialisierung bei jedem Tab-Wechsel.
+- Beim Zurückkehren aus der Navigation wird der bestehende Kartenaufbau wiederverwendet; bei geänderten Parkplatzdaten oder Kartenquelle erfolgt gezielter Neuaufbau.
+- Kamera/Zoom bleiben bei Änderungen des selben Parkplatzes erhalten; neuer Parkplatz wird weiterhin bewusst fokussiert.
+- Arbeitsspeicher-Kachelcache von 9 auf 64 Kacheln angehoben; kleiner Kachelrand für schnelleres Verschieben.
+- Kürzere Kartenanimationen und Vermeidung unnötiger Zoomwechsel bei Standortaktualisierung.
+- Hardwarebeschleunigung für Kartendarstellung explizit aktiviert; keine aggressiveren OSM-Netzwerkdownloads.
+- Fußwegnavigation verwendet dieselben Karteneinstellungen; Kompassaktualisierung auf etwa 12 FPS begrenzt, magnetische Deklination wird zwischengespeichert.
+- Unit-Tests für Zustandsvergleich, Kartenwiederverwendung und Zoomschwelle; VersionCode 16, keine Datenbankänderung.
+- Messbare FPS-/Kartenladezeiten müssen auf einem echten Android-Gerät geprüft werden. Offline-Vektorkarten benötigen weiterhin Renderingzeit für neue, noch nicht zwischengespeicherte Gebiete.
+
 ## 1.2.2 · 28. Oktober 2026
 - Der aktive Parkplatz kann direkt unter „Weitere Aktionen“ gelöscht werden, ohne erst den Verlauf zu öffnen.
 - Löschaktion ist dezent rot und benötigt eine ausdrückliche Bestätigung.
