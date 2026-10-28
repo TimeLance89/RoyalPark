@@ -1,5 +1,15 @@
 # Changelog
 
+## 1.1.0 · 28. Oktober 2026
+- Erststart-Onboarding mit vier eigenständigen, überspringbaren Seiten
+- Standortberechtigung nur auf Benutzeraktion, keine automatische Aktivierung der Fahrzeugüberwachung
+- Karte mit moderner Top-Leiste und kompakter Steuergruppe (Ich/Auto/Beide)
+- Klarere Parkplatzansicht mit prominenter Route und reduzierten Schnellaktionen
+- Verlauf auf kompakte Karte mit Aktionen umgestellt
+- Einführung über Einstellungen wiederholbar
+- GPS-Warndialog und erzwungene Notiz nach Speichern entfernt
+- Keine Datenbankänderung; versionCode 12
+
 ## 1.0.1 · 28. Oktober 2026
 - Kein automatisch aufspringender Genauigkeits-Dialog beim Parkplatzspeichern mehr.
 - Kein erzwungener Notiz-Dialog nach dem Speichern, auch nicht nach manueller Kartenmarkierung.

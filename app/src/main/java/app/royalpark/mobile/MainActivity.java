@@ -62,13 +62,13 @@ import java.util.concurrent.Executors;
  */
 public final class MainActivity extends Activity {
     // Light map-first visual language, guided by screenshots of reference version 1.1.15.
-    private static final int BG = Color.rgb(247, 249, 251);
+    private static final int BG = Color.rgb(247, 250, 251);
     private static final int CARD = Color.WHITE;
-    private static final int CARD_BRIGHT = Color.rgb(235, 246, 250);
-    private static final int ACCENT = Color.rgb(88, 196, 213);
-    private static final int ACCENT_DARK = Color.rgb(29, 146, 171);
-    private static final int WHITE = Color.rgb(30, 48, 62);
-    private static final int MUTED = Color.rgb(104, 122, 137);
+    private static final int CARD_BRIGHT = Color.rgb(233, 246, 246);
+    private static final int ACCENT = Color.rgb(0, 150, 157);
+    private static final int ACCENT_DARK = Color.rgb(0, 118, 128);
+    private static final int WHITE = Color.rgb(21, 45, 54);
+    private static final int MUTED = Color.rgb(104, 124, 132);
     private static final int REQ_LOCATION = 100;
     private static final int REQ_BT = 101;
     private static final int REQ_NOTIFICATIONS = 102;
@@ -140,6 +140,13 @@ public final class MainActivity extends Activity {
         bottomBar.setBackgroundColor(CARD);
         mainRoot.addView(bottomBar);
         showTab(TAB_MAP);
+        // Onboarding happens once and never blocks an existing user's data migration.
+        if (state == null && !prefs.getBoolean("onboarding_complete", false)) {
+            mainRoot.post(() -> {
+                if (!isFinishing() && !isDestroyed())
+                    startActivity(new Intent(this, OnboardingActivity.class));
+            });
+        }
         handleWidgetAction(getIntent());
     }
 
@@ -183,6 +190,12 @@ public final class MainActivity extends Activity {
         return drawable;
     }
 
+    private GradientDrawable surface(int color, int stroke, int radius) {
+        GradientDrawable drawable = shape(color, radius);
+        drawable.setStroke(dp(1), stroke);
+        return drawable;
+    }
+
     private TextView text(String value, int size, int color, boolean bold) {
         TextView view = new TextView(this);
         view.setText(value);
@@ -208,8 +221,8 @@ public final class MainActivity extends Activity {
 
     private LinearLayout card() {
         LinearLayout view = column();
-        view.setBackground(shape(CARD, 20));
-        view.setElevation(dp(3));
+        view.setBackground(surface(CARD, Color.rgb(223, 233, 236), 22));
+        view.setElevation(dp(2));
         view.setPadding(dp(18), dp(17), dp(18), dp(17));
         return view;
     }
@@ -227,25 +240,26 @@ public final class MainActivity extends Activity {
     private TextView action(String caption, boolean primary, Runnable task) {
         TextView button = text(caption, 15, primary ? Color.WHITE : ACCENT_DARK, true);
         button.setGravity(Gravity.CENTER);
-        button.setPadding(dp(16), dp(13), dp(16), dp(13));
-        button.setBackground(shape(primary ? ACCENT : CARD_BRIGHT, 14));
+        button.setPadding(dp(16), dp(14), dp(16), dp(14));
+        button.setMinHeight(dp(50));
+        button.setBackground(shape(primary ? ACCENT_DARK : CARD_BRIGHT, 17));
         button.setOnClickListener(v -> task.run());
         return button;
     }
 
     private void actionLine(LinearLayout parent, String title, boolean primary, Runnable task) {
-        margin(parent, action(title, primary, task), 12);
+        margin(parent, action(title, primary, task), 9);
     }
 
     private void header() {
         headerView = row();
         headerView.setBackgroundColor(CARD);
-        headerView.setPadding(dp(20), dp(13), dp(20), dp(13));
+        headerView.setPadding(dp(14), dp(9), dp(14), dp(9));
         TextView back = text("‹", 34, ACCENT_DARK, false);
         back.setGravity(Gravity.CENTER);
         back.setOnClickListener(v -> showTab(TAB_MAP));
         headerView.addView(back, new LinearLayout.LayoutParams(dp(40), dp(43)));
-        TextView heading = text("RoyalPark", 20, WHITE, true);
+        TextView heading = text("royalpark", 21, WHITE, true);
         heading.setGravity(Gravity.CENTER);
         headerView.addView(heading, new LinearLayout.LayoutParams(0, dp(43), 1));
         TextView map = text("⌖", 25, ACCENT_DARK, true);
@@ -282,7 +296,7 @@ public final class MainActivity extends Activity {
         bottomBar.removeAllViews();
         nav("⌖", "Karte", TAB_MAP);
         nav("◷", "Verlauf", TAB_HISTORY);
-        nav("⚙", "Einstellungen", TAB_SETTINGS);
+        nav("⚙", "Mehr", TAB_SETTINGS);
     }
 
     private void nav(String symbol, String label, int tab) {
@@ -395,9 +409,21 @@ public final class MainActivity extends Activity {
         }
         canvas.addView(map, new FrameLayout.LayoutParams(-1, -1));
 
-        TextView settings = floatingButton("⚙", 24, () -> showTab(TAB_SETTINGS));
-        canvas.addView(settings, floatingAt(47, 47, Gravity.TOP | Gravity.LEFT, 17, 17, 0, 0));
-        TextView layers = floatingButton(offline ? "Offline" : "Karte", 15, () -> {
+        // A calm, single top bar rather than scattered large circles.
+        TextView brand = text("  ◉  royalpark  ", 17, WHITE, true);
+        brand.setGravity(Gravity.CENTER);
+        brand.setBackground(surface(Color.WHITE, Color.rgb(227, 236, 237), 21));
+        brand.setElevation(dp(4));
+        brand.setOnClickListener(v -> showTab(TAB_SETTINGS));
+        FrameLayout.LayoutParams brandParams = floatingAt(144, 44,
+                Gravity.TOP | Gravity.LEFT, 14, 14, 0, 0);
+        canvas.addView(brand, brandParams);
+
+        TextView layers = text(offline ? "◈  Offline" : "▱  Karte", 14, ACCENT_DARK, true);
+        layers.setGravity(Gravity.CENTER);
+        layers.setBackground(surface(Color.WHITE, Color.rgb(227, 236, 237), 21));
+        layers.setElevation(dp(4));
+        layers.setOnClickListener(v -> {
             new AlertDialog.Builder(this)
                     .setTitle("Kartenansicht")
                     .setItems(new String[]{"Onlinekarte (Standard)",
@@ -420,104 +446,156 @@ public final class MainActivity extends Activity {
                         else showTab(TAB_SETTINGS);
                     }).show();
         });
-        canvas.addView(layers, floatingAt(98, 47, Gravity.TOP | Gravity.RIGHT, 0, 17, 17, 0));
+        canvas.addView(layers, floatingAt(110, 44,
+                Gravity.TOP | Gravity.RIGHT, 0, 14, 14, 0));
 
-        TextView history = floatingButton("◷", 25, () -> showTab(TAB_HISTORY));
-        canvas.addView(history, floatingAt(47, 47, Gravity.TOP | Gravity.LEFT, 17, 76, 0, 0));
+        TextView history = text("◷  Verlauf", 13, WHITE, true);
+        history.setGravity(Gravity.CENTER);
+        history.setBackground(surface(Color.WHITE, Color.rgb(227, 236, 237), 18));
+        history.setElevation(dp(3));
+        history.setOnClickListener(v -> showTab(TAB_HISTORY));
+        canvas.addView(history, floatingAt(104, 37,
+                Gravity.TOP | Gravity.LEFT, 14, 67, 0, 0));
 
-        if (deviceLocation != null && deviceLocation.hasAccuracy()) {
-            TextView gps = text("GPS ±" + Math.round(deviceLocation.getAccuracy()) + " m", 12, ACCENT_DARK, true);
-            gps.setPadding(dp(12), 0, dp(12), 0);
+        if (deviceLocation != null) {
+            boolean precise = LocationGateway.hasPrecisePermission(this);
+            String gpsCaption = precise && deviceLocation.hasAccuracy()
+                    ? "⌖  GPS ±" + Math.round(deviceLocation.getAccuracy()) + " m"
+                    : "⌖  Ungefährer Standort";
+            TextView gps = text(gpsCaption, 12, ACCENT_DARK, true);
             gps.setGravity(Gravity.CENTER);
-            gps.setBackground(shape(Color.WHITE, 18));
+            gps.setPadding(dp(10), 0, dp(10), 0);
+            gps.setBackground(surface(Color.WHITE, Color.rgb(227, 236, 237), 16));
             gps.setElevation(dp(3));
-            canvas.addView(gps, floatingAt(108, 32, Gravity.TOP | Gravity.LEFT, 17, 137, 0, 0));
+            FrameLayout.LayoutParams gpsParams = new FrameLayout.LayoutParams(
+                    -2, dp(32), Gravity.TOP | Gravity.LEFT);
+            gpsParams.setMargins(dp(14), dp(111), 0, 0);
+            canvas.addView(gps, gpsParams);
         }
 
-        LinearLayout sheet = card();
-        sheet.setBackground(shape(Color.WHITE, 24));
-        sheet.setElevation(dp(12));
-        sheet.setPadding(dp(17), dp(14), dp(17), dp(17));
-        if (active == null) {
-            line(sheet, "MEIN PARKPLATZ", 12, ACCENT_DARK, true, 0);
-            line(sheet, "Wo steht dein Auto?", 23, WHITE, true, 7);
-            line(sheet, "Tippe auf Speichern, sobald du geparkt hast.", 13, MUTED, false, 7);
-            actionLine(sheet, "＋  Parkplatz speichern", true, this::saveCurrent);
-            actionLine(sheet, "⌖  Meinen Standort anzeigen", false, this::showMyLocation);
-        } else {
-            LinearLayout headline = row();
-            LinearLayout heading = column();
-            line(heading, "PARKPLATZ", 11, ACCENT_DARK, true, 0);
-            line(heading, "Dein Auto steht hier", 21, WHITE, true, 5);
-            line(heading, format(active.parkedAt), 12, MUTED, false, 5);
-            line(heading, "Geparkt " + DateUtils.getRelativeTimeSpanString(
-                    active.parkedAt, System.currentTimeMillis(), DateUtils.MINUTE_IN_MILLIS),
-                    12, MUTED, false, 5);
-            headline.addView(heading, new LinearLayout.LayoutParams(0, -2, 1));
-            TextView close = text("⋯", 28, MUTED, true);
-            close.setGravity(Gravity.CENTER);
-            close.setOnClickListener(v -> new AlertDialog.Builder(this)
-                    .setItems(new String[]{"Parkplatz neu speichern", "Verlauf öffnen", "Parkhausangaben bearbeiten"}, (d, selected) -> {
-                        if (selected == 0) saveCurrent();
-                        else if (selected == 1) showTab(TAB_HISTORY);
-                        else editGarage(active);
-                    }).show());
-            headline.addView(close, new LinearLayout.LayoutParams(dp(42), dp(42)));
-            sheet.addView(headline);
-            if (deviceLocation != null && deviceLocation.hasAccuracy()) {
-                line(sheet, "Standortgenauigkeit  ±" + Math.round(deviceLocation.getAccuracy()) + " m",
-                        12, ACCENT_DARK, false, 9);
-            }
-            parkingDistanceLine = text("Luftlinie zum Auto: Standort ermitteln", 13, ACCENT_DARK, true);
-            parkingDistanceLine.setOnClickListener(v -> focusBoth());
-            margin(sheet, parkingDistanceLine, 8);
-            updateParkingDistance();
-            String garage = GarageLabels.summary(active.floor, active.space);
-            if (!garage.isEmpty()) line(sheet, "Parkhaus: " + garage, 13, ACCENT_DARK, true, 7);
-            if (!active.note.isEmpty()) line(sheet, active.note, 13, MUTED, false, 7);
-            if (active.timerAt > 0) line(sheet, "Parkuhr bis " + format(active.timerAt),
-                    13, ACCENT_DARK, true, 7);
-            threeActions(sheet,
-                    quickAction("➤", "Route", () -> navigate(active)),
-                    quickAction("◷", "Parkuhr", () -> timer(active)),
-                    quickAction("▤", "Notiz", () -> editNote(active)));
-            threeActions(sheet,
-                    quickAction("▣", "Foto", () -> photo(active)),
-                    quickAction("↗", "Teilen", () -> share(active)),
-                    quickAction("▤", "Parkhaus", () -> editGarage(active)));
-        }
-        FrameLayout.LayoutParams sheetParams = new FrameLayout.LayoutParams(
-                -1, -2, Gravity.BOTTOM | Gravity.CENTER_HORIZONTAL);
-        sheetParams.setMargins(dp(12), 0, dp(12), dp(14));
-        canvas.addView(sheet, sheetParams);
-
+        // One slim, unified camera control rail.
+        LinearLayout cameras = column();
+        cameras.setPadding(dp(4), dp(5), dp(4), dp(5));
+        cameras.setGravity(Gravity.CENTER);
+        cameras.setBackground(surface(Color.WHITE, Color.rgb(223, 233, 236), 20));
+        cameras.setElevation(dp(5));
         locationButton = new ImageButton(this);
         locationButton.setImageResource(R.drawable.ic_my_location);
         locationButton.setColorFilter(ACCENT_DARK);
         locationButton.setScaleType(ImageView.ScaleType.CENTER_INSIDE);
         locationButton.setPadding(dp(12), dp(12), dp(12), dp(12));
-        locationButton.setContentDescription("Zu meinem Standort springen");
-        locationButton.setBackground(shape(Color.WHITE, 25));
-        locationButton.setElevation(dp(7));
+        locationButton.setContentDescription("Mein Standort");
+        locationButton.setBackground(shape(Color.TRANSPARENT, 18));
         locationButton.setOnClickListener(v -> showMyLocation());
-        // Explicit camera controls remain accessible above the parking bottom sheet.
-        canvas.addView(locationButton, floatingAt(51, 51, Gravity.TOP | Gravity.RIGHT,
-                0, 78, 17, 0));
-        TextView focusCar = floatingButton("AUTO", 12, this::focusParked);
-        focusCar.setContentDescription("Nah an meinen geparkten Wagen zoomen");
-        canvas.addView(focusCar, floatingAt(54, 49, Gravity.TOP | Gravity.RIGHT, 0, 138, 17, 0));
-        TextView focusBoth = floatingButton("BEIDE", 12, this::focusBoth);
-        focusBoth.setContentDescription("Auto und meinen Standort zusammen anzeigen");
-        canvas.addView(focusBoth, floatingAt(54, 49, Gravity.TOP | Gravity.RIGHT, 0, 197, 17, 0));
-
+        cameras.addView(locationButton, new LinearLayout.LayoutParams(dp(50), dp(50)));
+        View divider1 = new View(this);
+        divider1.setBackgroundColor(0xFFE8F1F2);
+        cameras.addView(divider1, new LinearLayout.LayoutParams(-1, dp(1)));
+        TextView focusCar = text("Auto", 12, ACCENT_DARK, true);
+        focusCar.setGravity(Gravity.CENTER);
+        focusCar.setContentDescription("Parkplatz nah anzeigen");
+        focusCar.setOnClickListener(v -> focusParked());
+        cameras.addView(focusCar, new LinearLayout.LayoutParams(dp(50), dp(44)));
+        View divider2 = new View(this);
+        divider2.setBackgroundColor(0xFFE8F1F2);
+        cameras.addView(divider2, new LinearLayout.LayoutParams(-1, dp(1)));
+        TextView focusBoth = text("Beide", 12, ACCENT_DARK, true);
+        focusBoth.setGravity(Gravity.CENTER);
+        focusBoth.setContentDescription("Auto und meinen Standort gemeinsam anzeigen");
+        focusBoth.setOnClickListener(v -> focusBoth());
+        cameras.addView(focusBoth, new LinearLayout.LayoutParams(dp(50), dp(44)));
+        canvas.addView(cameras, floatingAt(58, 147,
+                Gravity.TOP | Gravity.RIGHT, 0, 74, 14, 0));
         locationStatus = text("", 12, WHITE, true);
-        locationStatus.setGravity(Gravity.CENTER);
-        locationStatus.setPadding(dp(10), dp(4), dp(10), dp(4));
-        locationStatus.setBackground(shape(Color.WHITE, 10));
+        locationStatus.setPadding(dp(12), dp(7), dp(12), dp(7));
+        locationStatus.setBackground(shape(Color.WHITE, 14));
         locationStatus.setElevation(dp(4));
         locationStatus.setVisibility(View.GONE);
-        canvas.addView(locationStatus, floatingAt(164, 31, Gravity.TOP | Gravity.RIGHT,
-                0, 88, 77, 0));
+        FrameLayout.LayoutParams statusParams = new FrameLayout.LayoutParams(
+                -2, -2, Gravity.TOP | Gravity.RIGHT);
+        statusParams.setMargins(0, dp(229), dp(14), 0);
+        canvas.addView(locationStatus, statusParams);
+
+        LinearLayout sheet = card();
+        sheet.setBackground(shape(Color.WHITE, 26));
+        sheet.setElevation(dp(12));
+        sheet.setPadding(dp(18), dp(13), dp(18), dp(16));
+        View handle = new View(this);
+        handle.setBackground(shape(0xFFD9E7E8, 3));
+        LinearLayout.LayoutParams grip = new LinearLayout.LayoutParams(dp(37), dp(4));
+        grip.gravity = Gravity.CENTER_HORIZONTAL;
+        grip.bottomMargin = dp(10);
+        sheet.addView(handle, grip);
+
+        if (active == null) {
+            line(sheet, "PARKPLATZ", 11, ACCENT_DARK, true, 0);
+            line(sheet, "Wo steht dein Auto?", 22, WHITE, true, 6);
+            line(sheet, "Einmal speichern. Später einfach wiederfinden.", 13, MUTED, false, 5);
+            if (LocationGateway.hasPermission(this) &&
+                    !LocationGateway.hasPrecisePermission(this)) {
+                TextView precise = text("⌖  Standort nur ungefähr · verbessern", 12, ACCENT_DARK, true);
+                precise.setOnClickListener(v -> openLocationPermissionSettings());
+                margin(sheet, precise, 8);
+            }
+            actionLine(sheet, "＋  Parkplatz speichern", true, this::saveCurrent);
+            TextView manually = text("Auf Karte markieren  ·  lange gedrückt halten", 13, ACCENT_DARK, false);
+            manually.setGravity(Gravity.CENTER);
+            manually.setOnClickListener(v -> Toast.makeText(this,
+                    "Halte deinen Finger auf den gewünschten Parkplatz in der Karte.",
+                    Toast.LENGTH_SHORT).show());
+            margin(sheet, manually, 8);
+        } else {
+            LinearLayout headingRow = row();
+            LinearLayout heading = column();
+            line(heading, "DEIN PARKPLATZ", 11, ACCENT_DARK, true, 0);
+            line(heading, "Dein Auto steht hier", 21, WHITE, true, 4);
+            line(heading, "Geparkt " + DateUtils.getRelativeTimeSpanString(
+                    active.parkedAt, System.currentTimeMillis(), DateUtils.MINUTE_IN_MILLIS),
+                    12, MUTED, false, 4);
+            headingRow.addView(heading, new LinearLayout.LayoutParams(0, -2, 1));
+            TextView more = text("···", 24, MUTED, true);
+            more.setGravity(Gravity.CENTER);
+            more.setContentDescription("Parkplatzaktionen");
+            more.setOnClickListener(v -> showParkingMore(active));
+            headingRow.addView(more, new LinearLayout.LayoutParams(dp(43), dp(44)));
+            sheet.addView(headingRow);
+
+            parkingDistanceLine = text("⌖  Entfernung zum Auto ermitteln", 13, ACCENT_DARK, true);
+            parkingDistanceLine.setOnClickListener(v -> focusBoth());
+            margin(sheet, parkingDistanceLine, 8);
+            updateParkingDistance();
+            if (ParkingAccuracy.SOURCE_APPROXIMATE.equals(active.source)) {
+                TextView approximate = text("⌖  Nur ungefähre Position gespeichert", 12, MUTED, false);
+                margin(sheet, approximate, 7);
+                approximate.setOnClickListener(v -> openLocationPermissionSettings());
+            }
+            String garage = GarageLabels.summary(active.floor, active.space);
+            if (!garage.isEmpty()) line(sheet, garage, 13, MUTED, false, 5);
+            if (!active.note.isEmpty()) line(sheet, active.note, 13, MUTED, false, 5);
+            if (active.timerAt > 0) line(sheet, "Parkuhr bis " + format(active.timerAt),
+                    13, ACCENT_DARK, true, 5);
+
+            actionLine(sheet, "➤  Route zu meinem Auto", true, () -> navigate(active));
+            LinearLayout shortcuts = row();
+            LinearLayout.LayoutParams p = new LinearLayout.LayoutParams(0, dp(58), 1);
+            TextView timerButton = quickAction("◷", "Parkuhr", () -> timer(active));
+            shortcuts.addView(timerButton, p);
+            LinearLayout.LayoutParams p2 = new LinearLayout.LayoutParams(0, dp(58), 1);
+            p2.leftMargin = dp(8);
+            shortcuts.addView(quickAction("✎", "Notiz", () -> editNote(active)), p2);
+            LinearLayout.LayoutParams p3 = new LinearLayout.LayoutParams(0, dp(58), 1);
+            p3.leftMargin = dp(8);
+            shortcuts.addView(quickAction("▣", "Foto", () -> photo(active)), p3);
+            margin(sheet, shortcuts, 9);
+        }
+        ScrollView sheetScroll = new ScrollView(this);
+        sheetScroll.setVerticalScrollBarEnabled(false);
+        sheetScroll.setFillViewport(false);
+        sheetScroll.addView(sheet);
+        FrameLayout.LayoutParams sheetParams = new FrameLayout.LayoutParams(
+                -1, -2, Gravity.BOTTOM | Gravity.CENTER_HORIZONTAL);
+        sheetParams.setMargins(dp(12), 0, dp(12), dp(12));
+        canvas.addView(sheetScroll, sheetParams);
 
         // Provider attribution must remain accessible above the floating sheet.
         TextView attribution = text("© OpenStreetMap-Mitwirkende", 11, WHITE, false);
@@ -528,6 +606,25 @@ public final class MainActivity extends Activity {
         canvas.addView(attribution, floatingAt(190, 27, Gravity.BOTTOM | Gravity.LEFT,
                 12, 0, 0, active == null ? 260 : 318));
         canvas.post(this::showInitialPosition);
+    }
+
+    private void showParkingMore(ParkingSpot spot) {
+        new AlertDialog.Builder(this).setTitle("Dein Parkplatz")
+                .setItems(new String[]{
+                        "Neuen Parkplatz speichern",
+                        "Parkhausangaben bearbeiten",
+                        "Foto verwalten",
+                        "Standort teilen",
+                        "Parkverlauf öffnen"
+                }, (dialog, which) -> {
+                    switch (which) {
+                        case 0: saveCurrent(); break;
+                        case 1: editGarage(spot); break;
+                        case 2: photo(spot); break;
+                        case 3: share(spot); break;
+                        default: showTab(TAB_HISTORY); break;
+                    }
+                }).show();
     }
 
     private void showInitialPosition() {
@@ -543,55 +640,95 @@ public final class MainActivity extends Activity {
     }
 
     private void showHistory(LinearLayout content) {
-        line(content, "Deine Parkplätze", 24, WHITE, true, 6);
-        line(content, "Lokal gespeichert – nur auf diesem Gerät.", 14, MUTED, false, 6);
+        line(content, "Deine Parkplätze", 26, WHITE, true, 10);
         List<ParkingSpot> history = store.history();
+        line(content, history.isEmpty() ? "Hier findest du später deine gespeicherten Orte."
+                : history.size() + (history.size() == 1 ? " Parkplatz" : " Parkplätze")
+                        + " · nur auf diesem Gerät", 13, MUTED, false, 5);
         if (history.isEmpty()) {
             LinearLayout empty = card();
-            line(empty, "Noch kein Eintrag", 20, WHITE, true, 0);
-            line(empty, "Speichere deinen ersten Parkplatz über die Karte.", 14, MUTED, false, 9);
-            margin(content, empty, 20);
+            line(empty, "Noch kein Parkplatz gespeichert", 18, WHITE, true, 0);
+            line(empty, "Speichere deinen Standort, sobald du geparkt hast.", 14, MUTED, false, 8);
+            actionLine(empty, "Zur Karte", true, () -> showTab(TAB_MAP));
+            margin(content, empty, 18);
             return;
         }
         ParkingSpot active = store.active();
         for (ParkingSpot spot : history) {
             LinearLayout item = card();
-            boolean isActive = active != null && active.id == spot.id;
-            line(item, (isActive ? "●  AKTUELL  ·  " : "") + (("BLUETOOTH".equals(spot.source) || "MOTION".equals(spot.source)) ? "Automatisch" : "Manuell"),
-                    12, isActive ? ACCENT : MUTED, true, 0);
-            line(item, format(spot.parkedAt), 17, WHITE, true, 7);
-            line(item, String.format(Locale.GERMANY, "%.5f, %.5f", spot.latitude, spot.longitude),
-                    13, MUTED, false, 6);
-            String garage = GarageLabels.summary(spot.floor, spot.space);
-            if (!garage.isEmpty()) line(item, "Parkhaus: " + garage, 14, ACCENT_DARK, true, 5);
-            if (!spot.note.isEmpty()) line(item, spot.note, 14, WHITE, false, 5);
-            actionLine(item, "↗  Navigation", false, () -> navigate(spot));
-            actionLine(item, "▤  Parkhaus: Ebene und Stellplatz", false, () -> editGarage(spot));
-            actionLine(item, spot.photoUri.isEmpty() ? "▣  Parkplatzfoto hinzufügen" : "▣  Parkplatzfoto verwalten",
-                    false, () -> photo(spot));
-            actionLine(item, "↗  Parkplatz teilen", false, () -> share(spot));
-            actionLine(item, isActive ? "Aktueller Parkplatz ✓" : "Als aktuellen Parkplatz wählen", false, () -> {
-                store.setActiveId(spot.id);
-                ParkingWidget.updateAll(this);
-                showTab(TAB_HISTORY);
-            });
-            actionLine(item, "Eintrag löschen", false, () -> new AlertDialog.Builder(this)
-                    .setTitle("Parkplatz löschen?")
-                    .setMessage("Dieser Eintrag wird dauerhaft aus deinem Verlauf entfernt.")
-                    .setNegativeButton("Abbrechen", null)
-                    .setPositiveButton("Löschen", (d, which) -> {
-                        if (isActive) AlarmScheduler.cancel(this);
-                        store.delete(spot.id);
-                        ParkingWidget.updateAll(this);
-                        showTab(TAB_HISTORY);
-                    }).show());
-            margin(content, item, 14);
+            boolean current = active != null && active.id == spot.id;
+            line(item, current ? "●  AKTUELLES FAHRZEUG" : "PARKPLATZ",
+                    11, current ? ACCENT_DARK : MUTED, true, 0);
+            line(item, format(spot.parkedAt), 18, WHITE, true, 5);
+            String location = GarageLabels.summary(spot.floor, spot.space);
+            if (!location.isEmpty()) line(item, location, 13, MUTED, false, 5);
+            if (!spot.note.isEmpty()) line(item, spot.note, 13, MUTED, false, 4);
+            if (ParkingAccuracy.SOURCE_APPROXIMATE.equals(spot.source))
+                line(item, "⌖  Ungefähre Position", 12, MUTED, false, 5);
+            LinearLayout buttons = row();
+            LinearLayout.LayoutParams left = new LinearLayout.LayoutParams(0, dp(47), 1);
+            TextView route = action("➤  Route", true, () -> navigate(spot));
+            route.setTextSize(13);
+            buttons.addView(route, left);
+            LinearLayout.LayoutParams right = new LinearLayout.LayoutParams(0, dp(47), 1);
+            right.leftMargin = dp(9);
+            TextView more = action("···  Aktionen", false, () -> showHistoryActions(spot, current));
+            more.setTextSize(13);
+            buttons.addView(more, right);
+            margin(item, buttons, 12);
+            margin(content, item, 12);
         }
+    }
+
+    private void showHistoryActions(ParkingSpot spot, boolean current) {
+        String[] options = {
+                current ? "Aktueller Parkplatz" : "Als aktuellen Parkplatz wählen",
+                "Parkhaus / Stellplatz",
+                "Foto verwalten",
+                "Parkplatz teilen",
+                "Parkplatz löschen"
+        };
+        new AlertDialog.Builder(this).setTitle("Parkplatzaktionen")
+                .setItems(options, (dialog, which) -> {
+                    switch (which) {
+                        case 0:
+                            if (!current) {
+                                store.setActiveId(spot.id);
+                                ParkingWidget.updateAll(this);
+                                showTab(TAB_HISTORY);
+                            }
+                            break;
+                        case 1: editGarage(spot); break;
+                        case 2: photo(spot); break;
+                        case 3: share(spot); break;
+                        case 4:
+                            new AlertDialog.Builder(this)
+                                    .setTitle("Parkplatz löschen?")
+                                    .setMessage("Dieser Eintrag wird aus deinem Verlauf entfernt.")
+                                    .setNegativeButton("Abbrechen", null)
+                                    .setPositiveButton("Löschen", (d, choice) -> {
+                                        if (current) AlarmScheduler.cancel(this);
+                                        store.delete(spot.id);
+                                        ParkingWidget.updateAll(this);
+                                        showTab(TAB_HISTORY);
+                                    }).show();
+                            break;
+                    }
+                }).show();
     }
 
     private void showSettings(LinearLayout content) {
         line(content, "Einstellungen", 24, WHITE, true, 6);
-        line(content, "Alles lokal. Du entscheidest, wann Standort genutzt wird.", 14, MUTED, false, 8);
+        line(content, "Alles lokal. Alle Funktionen in deiner Hand.", 14, MUTED, false, 8);
+        LinearLayout intro = card();
+        line(intro, "ERSTE SCHRITTE", 11, ACCENT_DARK, true, 0);
+        line(intro, "RoyalPark kennenlernen", 18, WHITE, true, 7);
+        line(intro, "Die kurze Einführung kannst du jederzeit erneut ansehen.", 13, MUTED, false, 6);
+        actionLine(intro, "Einführung erneut starten", false, () -> {
+            prefs.edit().putBoolean("onboarding_complete", false).apply();
+            startActivity(new Intent(this, OnboardingActivity.class));
+        });
+        margin(content, intro, 13);
         LinearLayout bluetooth = card();
         line(bluetooth, "BLUETOOTH-AUTOMATIK", 12, ACCENT, true, 0);
         line(bluetooth, "Parkplatz automatisch merken", 19, WHITE, true, 8);
@@ -719,35 +856,31 @@ public final class MainActivity extends Activity {
 
     private void saveCurrent() {
         ensureLocation(() -> {
-            toast("Standort wird ermittelt …");
+            toast("Parkplatz wird gespeichert …");
             LocationGateway.once(this, (location, error) -> {
                 if (isFinishing() || isDestroyed()) return;
                 if (location == null) { error(error); return; }
-                // GPS in a garage may be imprecise. The user must confirm an uncertain location.
-                if (!location.hasAccuracy() || location.getAccuracy() > 80f) {
-                    new AlertDialog.Builder(this)
-                            .setTitle("Standort noch ungenau")
-                            .setMessage("Die gemeldete Genauigkeit beträgt " + (
-                                    location.hasAccuracy() ? "±" + Math.round(location.getAccuracy()) + " Meter"
-                                            : "unbekannt") +
-                                    ". Soll der Parkplatz trotzdem hier gespeichert werden? Du kannst die Stelle auch durch langes Tippen auf die Karte genau markieren.")
-                            .setNegativeButton("Abbrechen", null)
-                            .setNeutralButton("Erneut orten", (dialog, choice) -> saveCurrent())
-                            .setPositiveButton("Trotzdem speichern", (dialog, choice) -> persistParking(location))
-                            .show();
-                } else persistParking(location);
+                boolean approximate = ParkingAccuracy.approximate(
+                        LocationGateway.hasPrecisePermission(this), location.hasAccuracy(),
+                        location.hasAccuracy() ? location.getAccuracy() : Float.NaN);
+                store.save(location.getLatitude(), location.getLongitude(), "",
+                        approximate ? ParkingAccuracy.SOURCE_APPROXIMATE : "MANUAL");
+                AlarmScheduler.cancel(this);
+                ParkingWidget.updateAll(this);
+                deviceLocation = location;
+                showTab(TAB_MAP);
+                toast(approximate
+                        ? "Parkplatz ungefähr gespeichert. Du kannst ihn auf der Karte korrigieren."
+                        : "Parkplatz gespeichert");
             });
         });
     }
 
-    private void persistParking(Location location) {
-        ParkingSpot spot = store.save(location.getLatitude(), location.getLongitude(), "", "MANUAL");
-        AlarmScheduler.cancel(this);
-        ParkingWidget.updateAll(this);
-        deviceLocation = location;
-        toast("Parkplatz gespeichert");
-        showTab(TAB_MAP);
-        editNote(spot);
+    private void openLocationPermissionSettings() {
+        Intent intent = new Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS,
+                Uri.parse("package:" + getPackageName()));
+        try { startActivity(intent); }
+        catch (Exception ignored) { toast("Präzise Ortung unter Android-App-Berechtigungen erlauben."); }
     }
 
     private void showMyLocation() {
