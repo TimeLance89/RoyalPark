@@ -82,10 +82,17 @@ jobs:
           name: RoyalPark-UNSIGNED-release
           path: app/build/outputs/apk/release/app-release-unsigned.apk
           if-no-files-found: error
+      - name: Prepare local signing utility
+        if: ${{ hashFiles('app/build/outputs/apk/release/RoyalPark-release-signed.apk') == '' }}
+        run: |
+          set -euo pipefail
+          mkdir -p app/build/outputs/signing-tools
+          cp "$ANDROID_HOME/build-tools/35.0.0/lib/apksigner.jar" app/build/outputs/signing-tools/apksigner.jar
+          test -s app/build/outputs/signing-tools/apksigner.jar
       - name: Provide local signing utility
         if: ${{ hashFiles('app/build/outputs/apk/release/RoyalPark-release-signed.apk') == '' }}
         uses: actions/upload-artifact@v4
         with:
           name: Android-apksigner-tool
-          path: ${{ env.ANDROID_HOME }}/build-tools/35.0.0/lib/apksigner.jar
+          path: app/build/outputs/signing-tools/apksigner.jar
           if-no-files-found: error
