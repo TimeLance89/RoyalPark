@@ -8,10 +8,36 @@ public final class NavigationPresentation {
 
     public static String distanceText(double distanceMeters, float reportedAccuracy) {
         if (!Double.isFinite(distanceMeters) || distanceMeters < 0) return "–";
+        // When the GPS uncertainty circle contains the car, a numerical
+        // distance would imply a precision the device simply doesn't have.
+        if (!Float.isFinite(reportedAccuracy) || reportedAccuracy < 0)
+            return "Zielbereich";
+        if (reportedAccuracy > 40f && distanceMeters <= reportedAccuracy)
+            return "Zielbereich";
         String distance = NavigationMath.formatDistance(distanceMeters);
-        if (Float.isFinite(reportedAccuracy) && reportedAccuracy > 50)
-            return "≈ " + distance;
-        return distance;
+        return reportedAccuracy > 40f ? "ca. " + distance : distance;
+    }
+
+    public static String locationHint(double distanceMeters, float accuracyMeters,
+            boolean precisePermission, boolean parkingApproximate) {
+        if (!precisePermission || !Float.isFinite(accuracyMeters)
+                || accuracyMeters > 40f || accuracyMeters < 0)
+            return Float.isFinite(accuracyMeters) && accuracyMeters >= 0
+                    ? "GPS ±" + Math.round(accuracyMeters) + " m · ungenau"
+                    : "Standort ungenau";
+        if (parkingApproximate) return "Parkplatz nur ungefähr gespeichert";
+        if (closeToCar(distanceMeters, accuracyMeters, precisePermission, false))
+            return "Auto vermutlich in deiner Nähe";
+        return "Luftlinie zum Auto";
+    }
+
+    /** Never claim an arrival with coarse GPS or an imprecise saved spot. */
+    public static boolean closeToCar(double distanceMeters, float accuracyMeters,
+            boolean precisePermission, boolean parkingApproximate) {
+        return precisePermission && !parkingApproximate
+                && Double.isFinite(distanceMeters) && distanceMeters >= 0
+                && Float.isFinite(accuracyMeters) && accuracyMeters >= 0
+                && accuracyMeters <= 12f && distanceMeters <= 12.0;
     }
 
     public static String walkingDuration(double seconds) {

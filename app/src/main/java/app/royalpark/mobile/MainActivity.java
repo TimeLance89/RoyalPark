@@ -1576,6 +1576,8 @@ public final class MainActivity extends Activity {
             Intent intent = new Intent(this, NavigateActivity.class);
             intent.putExtra("latitude", spot.latitude);
             intent.putExtra("longitude", spot.longitude);
+            intent.putExtra("parking_approximate",
+                    ParkingAccuracy.SOURCE_APPROXIMATE.equals(spot.source));
             startActivity(intent);
         });
     }
