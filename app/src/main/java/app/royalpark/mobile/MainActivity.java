@@ -623,14 +623,42 @@ public final class MainActivity extends Activity {
         sheetParams.setMargins(dp(12), 0, dp(12), dp(12));
         canvas.addView(sheetScroll, sheetParams);
 
-        // Provider attribution must remain accessible above the floating sheet.
-        TextView attribution = text("© OpenStreetMap-Mitwirkende", 11, WHITE, false);
+        // The OpenStreetMap attribution is mandatory, but must never cover the
+        // parking card. Anchor it dynamically just ABOVE the card's real height.
+        // The card expands/collapses and varies with font size, so fixed 318dp
+        // margins are incorrect (particularly on small phones like HyperOS).
+        TextView attribution = text("© OpenStreetMap-Mitwirkende", 10, MUTED, false);
         attribution.setGravity(Gravity.CENTER);
-        attribution.setPadding(dp(6), dp(3), dp(6), dp(3));
-        attribution.setBackground(shape(Color.argb(220, 255, 255, 255), 5));
+        attribution.setContentDescription("Kartenquelle OpenStreetMap – Lizenzinformationen öffnen");
+        attribution.setPadding(dp(7), dp(3), dp(7), dp(3));
+        attribution.setBackground(shape(Color.argb(200, 255, 255, 255), 8));
         attribution.setOnClickListener(v -> openUrl("https://www.openstreetmap.org/copyright"));
-        canvas.addView(attribution, floatingAt(190, 27, Gravity.BOTTOM | Gravity.LEFT,
-                12, 0, 0, active == null ? 260 : 318));
+        FrameLayout.LayoutParams attributionParams = new FrameLayout.LayoutParams(
+                -2, -2, Gravity.BOTTOM | Gravity.LEFT);
+        attributionParams.leftMargin = dp(14);
+        canvas.addView(attribution, attributionParams);
+        Runnable repositionAttribution = () -> {
+            if (canvas.getHeight() <= 0) return;
+            FrameLayout.LayoutParams params =
+                    (FrameLayout.LayoutParams) attribution.getLayoutParams();
+            int aboveSheet = sheetScroll.getHeight() + dp(22);
+            // In very small windows the sheet may cover most of the map:
+            // move the attribution into the remaining upper map area instead.
+            if (canvas.getHeight() - aboveSheet < dp(178)) {
+                params.gravity = Gravity.TOP | Gravity.LEFT;
+                params.topMargin = dp(157);
+                params.bottomMargin = 0;
+            } else {
+                params.gravity = Gravity.BOTTOM | Gravity.LEFT;
+                params.bottomMargin = aboveSheet;
+                params.topMargin = 0;
+            }
+            attribution.setLayoutParams(params);
+        };
+        sheetScroll.addOnLayoutChangeListener(
+                (v, left, top, right, bottom, oldLeft, oldTop, oldRight, oldBottom) ->
+                        repositionAttribution.run());
+        canvas.post(repositionAttribution);
         canvas.post(this::showInitialPosition);
     }
 

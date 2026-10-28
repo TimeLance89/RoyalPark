@@ -1,5 +1,12 @@
 # Changelog
 
+## 1.2.1 · 28. Oktober 2026
+- Kartenquellenangabe von OpenStreetMap bleibt sichtbar und führt zur Lizenzseite, überdeckt aber nicht mehr den Text der Parkplatzkarte.
+- Quellenangabe folgt dynamisch der tatsächlichen Höhe des Parkplatzfensters (eingeklappt, aufgeklappt, bei anderer Schriftgröße).
+- Schrift und Hintergrund des Quellenhinweises reduziert, damit er weniger von der Karte ablenkt.
+- Auf sehr kleinen Displays wird die Angabe in den oberen freien Kartenbereich verschoben.
+- Keine Datenbankänderung; versionCode 14 und weiterhin dasselbe Release-Signaturzertifikat.
+
 ## 1.2.0 · 28. Oktober 2026
 - Einstellungsseite zeigt dynamisch die tatsächlich installierte Versionsnummer statt eines veralteten statischen Textes.
 - Der Zusatz „Eigenständiger Neubau“ wurde aus der Oberfläche entfernt.
