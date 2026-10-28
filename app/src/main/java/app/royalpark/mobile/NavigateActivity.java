@@ -136,7 +136,7 @@ public final class NavigateActivity extends Activity
         view.setOnClickListener(v -> click.run());
         return view;
     }
-    private void addRowItem(LinearLayout row, View child, int weight, int marginLeft) {
+    private void addRowItem(LinearLayout row, View child, float weight, int marginLeft) {
         LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(0, dp(48), weight);
         lp.leftMargin = dp(marginLeft);
         row.addView(child, lp);
