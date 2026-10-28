@@ -147,9 +147,7 @@ public final class NavigateActivity extends Activity
     }
     private void updateMode() {
         if (modeText == null) return;
-        modeText.setText(offlineRouteActive && route != null ? "Offline-Route aktiv"
-                : route != null ? "Online-Route aktiv" :
-                  selectedOffline ? "Offline · BRouter" : "Online · Valhalla");
+        modeText.setText("ROUTENMODUS · " + (selectedOffline ? "OFFLINE" : "ONLINE"));
         if (offlineModeButton != null)
             offlineModeButton.setBackground(background(selectedOffline ? 0xFFE1F3F3 : 0xFFF5F7F8,
                     15, selectedOffline ? 0xFFB4DEDF : Color.TRANSPARENT));
@@ -269,35 +267,19 @@ public final class NavigateActivity extends Activity
         guideParams.setMargins(dp(12), dp(12), dp(12), 0);
         mapFrame.addView(guidance, guideParams);
 
-        LinearLayout tools = new LinearLayout(this);
-        tools.setOrientation(LinearLayout.VERTICAL);
-        tools.setElevation(dp(5));
-        tools.setBackground(background(Color.WHITE, 19, Color.TRANSPARENT));
-        TextView zoomIn = smallAction("+", () -> map.getController().zoomIn());
-        zoomIn.setTextSize(24);
-        tools.addView(zoomIn, new LinearLayout.LayoutParams(dp(48), dp(47)));
-        View split = new View(this);
-        split.setBackgroundColor(0xFFE3ECEE);
-        tools.addView(split, new LinearLayout.LayoutParams(dp(48), dp(1)));
-        TextView zoomOut = smallAction("−", () -> map.getController().zoomOut());
-        zoomOut.setTextSize(26);
-        tools.addView(zoomOut, new LinearLayout.LayoutParams(dp(48), dp(47)));
-        FrameLayout.LayoutParams toolParams = new FrameLayout.LayoutParams(
-                dp(48), dp(95), Gravity.RIGHT | Gravity.BOTTOM);
-        toolParams.rightMargin = dp(13);
-        mapFrame.addView(tools, toolParams);
+        // Pinch-zoom is already supported. Only one floating recenter control is needed.
         TextView follow = smallAction("⌖", () -> {
-            if (current == null) {
-                toast("Standort wird noch ermittelt.");
-            } else {
+            if (current == null) toast("Standort wird noch ermittelt.");
+            else {
                 map.getController().animateTo(
                         new GeoPoint(current.getLatitude(), current.getLongitude()));
-                map.getController().setZoom(18);
+                if (map.getZoomLevelDouble() < 17) map.getController().setZoom(17.5);
             }
         });
         follow.setTextSize(24);
         follow.setContentDescription("Meinen Standort zentrieren");
-        follow.setElevation(dp(5));
+        follow.setElevation(dp(3));
+        follow.setBackground(background(Color.WHITE, 18, 0xFFE5EBEE));
         FrameLayout.LayoutParams followParams = new FrameLayout.LayoutParams(
                 dp(48), dp(48), Gravity.RIGHT | Gravity.BOTTOM);
         followParams.rightMargin = dp(13);
@@ -305,35 +287,32 @@ public final class NavigateActivity extends Activity
 
         LinearLayout sheet = new LinearLayout(this);
         sheet.setOrientation(LinearLayout.VERTICAL);
-        sheet.setPadding(dp(14), dp(8), dp(14), dp(14));
-        sheet.setBackground(background(Color.WHITE, 25, 0xFFE8EFF0));
-        sheet.setElevation(dp(9));
+        sheet.setPadding(dp(12), dp(8), dp(12), dp(10));
+        sheet.setBackground(background(Color.WHITE, 21, 0xFFE8EFF0));
+        sheet.setElevation(dp(7));
         View grip = new View(this);
         grip.setBackground(background(0xFFD7E1E3, 4, Color.TRANSPARENT));
-        LinearLayout.LayoutParams gp = new LinearLayout.LayoutParams(dp(37), dp(4));
+        LinearLayout.LayoutParams gp = new LinearLayout.LayoutParams(dp(32), dp(4));
         gp.gravity = Gravity.CENTER_HORIZONTAL;
-        gp.bottomMargin = dp(10);
+        gp.bottomMargin = dp(8);
         sheet.addView(grip, gp);
+
         LinearLayout commandRow = new LinearLayout(this);
-        commandRow.setOrientation(LinearLayout.HORIZONTAL);
-        recalculateButton = action("⟳ Neu", true);
-        recalculateButton.setContentDescription("Gewählte Route neu berechnen");
+        recalculateButton = action("Route berechnen", true);
+        recalculateButton.setContentDescription("Gewählte Fußwegroute berechnen oder aktualisieren");
         recalculateButton.setOnClickListener(v -> recalculate());
-        addRowItem(commandRow, recalculateButton, 1.35f, 0);
-        speechButton = action("Ansagen aus", false);
-        speechButton.setOnClickListener(v -> toggleSpeech());
-        addRowItem(commandRow, speechButton, 1.25f, 8);
+        addRowItem(commandRow, recalculateButton, 2.1f, 0);
         moreButton = action("Mehr", false);
         moreButton.setOnClickListener(v -> setSheetExpanded(!controlsExpanded));
-        addRowItem(commandRow, moreButton, 0.8f, 8);
+        addRowItem(commandRow, moreButton, 0.9f, 8);
         sheet.addView(commandRow);
-        modeText = label("Route wählen", 12, MUTED, false);
-        modeText.setPadding(dp(8), dp(8), 0, 0);
-        sheet.addView(modeText);
 
-        // Expanded options are hidden by default to give most of the height to the map.
         secondaryControls = new LinearLayout(this);
         secondaryControls.setOrientation(LinearLayout.VERTICAL);
+        modeText = label("ROUTENMODUS", 11, MUTED, true);
+        modeText.setGravity(Gravity.START | Gravity.CENTER_VERTICAL);
+        modeText.setPadding(dp(3), dp(11), 0, dp(5));
+        secondaryControls.addView(modeText);
         LinearLayout modes = new LinearLayout(this);
         offlineModeButton = smallAction("Offline · BRouter", () -> {
             selectedOffline = true;
@@ -343,21 +322,23 @@ public final class NavigateActivity extends Activity
             selectedOffline = false;
             updateMode();
         });
-        addRowItem(modes, offlineModeButton, 1.5f, 0);
-        addRowItem(modes, onlineModeButton, 1, 8);
+        addRowItem(modes, offlineModeButton, 1.6f, 0);
+        addRowItem(modes, onlineModeButton, 1f, 8);
         secondaryControls.addView(modes);
         LinearLayout extras = new LinearLayout(this);
-        TextView external = smallAction("↗ Externe Karte", this::openExternal);
-        addRowItem(extras, external, 1, 0);
+        speechButton = smallAction("Ansagen aus", this::toggleSpeech);
+        addRowItem(extras, speechButton, 1f, 0);
+        TextView external = smallAction("Externe Karte", this::openExternal);
+        addRowItem(extras, external, 1f, 8);
+        LinearLayout.LayoutParams exLp = new LinearLayout.LayoutParams(-1, -2);
+        exLp.topMargin = dp(8);
+        secondaryControls.addView(extras, exLp);
         TextView end = smallAction("Navigation beenden", this::finish);
         end.setTextColor(0xFFB54A56);
-        addRowItem(extras, end, 1.2f, 8);
-        LinearLayout.LayoutParams extraParams = new LinearLayout.LayoutParams(-1, -2);
-        extraParams.topMargin = dp(8);
-        secondaryControls.addView(extras, extraParams);
-        LinearLayout.LayoutParams secondaryParams = new LinearLayout.LayoutParams(-1, -2);
-        secondaryParams.topMargin = dp(8);
-        sheet.addView(secondaryControls, secondaryParams);
+        LinearLayout.LayoutParams endLp = new LinearLayout.LayoutParams(-1, dp(44));
+        endLp.topMargin = dp(8);
+        secondaryControls.addView(end, endLp);
+        sheet.addView(secondaryControls);
         FrameLayout.LayoutParams bottomParams = new FrameLayout.LayoutParams(
                 -1, -2, Gravity.BOTTOM);
         mapFrame.addView(sheet, bottomParams);
@@ -380,10 +361,7 @@ public final class NavigateActivity extends Activity
             FrameLayout.LayoutParams creditParams = (FrameLayout.LayoutParams) credit.getLayoutParams();
             creditParams.bottomMargin = sheet.getHeight() + dp(8);
             credit.setLayoutParams(creditParams);
-            FrameLayout.LayoutParams tp = (FrameLayout.LayoutParams) tools.getLayoutParams();
-            tp.bottomMargin = sheet.getHeight() + dp(70);
-            tools.setLayoutParams(tp);
-            FrameLayout.LayoutParams fp = (FrameLayout.LayoutParams) follow.getLayoutParams();
+             FrameLayout.LayoutParams fp = (FrameLayout.LayoutParams) follow.getLayoutParams();
             fp.bottomMargin = sheet.getHeight() + dp(15);
             follow.setLayoutParams(fp);
         };
@@ -458,7 +436,7 @@ public final class NavigateActivity extends Activity
                 current.getLongitude(), targetLat, targetLon, (result, error) -> {
                     if (isFinishing() || isDestroyed()) return;
                     loading = false;
-                    recalculateButton.setText("⟳ Neu");
+                    recalculateButton.setText("Route berechnen");
                     if (result != null) displayRoute(result, true);
                     else {
                         stepText.setText("Keine Offline-Route – Kompass funktioniert weiterhin.");
@@ -467,7 +445,7 @@ public final class NavigateActivity extends Activity
                 });
         if (!started) {
             loading = false;
-            recalculateButton.setText("⟳ Neu");
+            recalculateButton.setText("Route berechnen");
         }
     }
 
@@ -492,7 +470,7 @@ public final class NavigateActivity extends Activity
             runOnUiThread(() -> {
                 if (isFinishing() || isDestroyed()) return;
                 loading = false;
-                    recalculateButton.setText("⟳ Neu");
+                    recalculateButton.setText("Route berechnen");
                 if (result == null) {
                     stepText.setText("Online-Routing nicht verfügbar – Kompass bleibt aktiv.");
                     routeDetails.setText(failure == null ? "Verbindung fehlgeschlagen" : failure);
@@ -505,6 +483,7 @@ public final class NavigateActivity extends Activity
 
     private void displayRoute(WalkingRouteService.Route result, boolean offline) {
         route = result;
+        recalculateButton.setText("Route aktualisieren");
         offlineRouteActive = offline;
         selectedOffline = offline;
         updateMode();
@@ -517,6 +496,7 @@ public final class NavigateActivity extends Activity
         routeDetails.setText(NavigationPresentation.walkingDuration(result.durationSeconds));
         if (offline) {
             stepText.setText("Folge der markierten Route");
+            stepText.setVisibility(View.VISIBLE);
         }
         if (!path.isEmpty()) {
             double north = -90, south = 90, west = 180, east = -180;
@@ -633,16 +613,25 @@ public final class NavigateActivity extends Activity
         if (current == null || map == null) return;
         double distance = NavigationMath.distanceMeters(current.getLatitude(),
                 current.getLongitude(), targetLat, targetLon);
-        distanceText.setText(NavigationPresentation.distanceText(distance,
-                current.hasAccuracy() ? current.getAccuracy() : Float.NaN));
+        float accuracy = current.hasAccuracy() ? current.getAccuracy() : Float.NaN;
+        boolean precise = LocationGateway.hasPrecisePermission(this);
+        distanceText.setText(NavigationPresentation.distanceText(distance, accuracy));
+        if (route == null) {
+            routeDetails.setText(NavigationPresentation.locationHint(
+                    distance, accuracy, precise, parkingApproximate));
+            stepText.setVisibility(View.GONE);
+        } else {
+            routeDetails.setText(NavigationPresentation.walkingDuration(route.durationSeconds));
+            stepText.setVisibility(View.VISIBLE);
+        }
         updateArrow();
         GeoPoint me = new GeoPoint(current.getLatitude(), current.getLongitude());
         myMarker.setPosition(me);
 
         if (route == null) {
             pointerLine.setPoints(Arrays.asList(me, new GeoPoint(targetLat, targetLon)));
-            if (distance < 20) stepText.setText("Beim Auto angekommen");
-            else stepText.setText("Luftlinie · Route optional");
+            // A coarse GPS fix cannot prove that the user reached the car.
+            stepText.setText("");
             if (!cameraCentered) {
                 cameraCentered = true;
                 map.zoomToBoundingBox(new BoundingBox(
@@ -689,8 +678,12 @@ public final class NavigateActivity extends Activity
             lastSpokenStep = stepNumber;
             speak(step.instruction);
         }
-        if (NavigationMath.distanceMeters(current.getLatitude(), current.getLongitude(),
-                targetLat, targetLon) < 18) stepText.setText("Beim Auto angekommen");
+        if (NavigationPresentation.closeToCar(
+                NavigationMath.distanceMeters(current.getLatitude(), current.getLongitude(),
+                        targetLat, targetLon),
+                current.hasAccuracy() ? current.getAccuracy() : Float.NaN,
+                LocationGateway.hasPrecisePermission(this), parkingApproximate))
+            stepText.setText("Auto wahrscheinlich in der Nähe");
     }
 
     @Override public void onAccuracyChanged(Sensor sensor, int accuracy) {}
